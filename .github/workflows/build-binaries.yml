@@ -3,160 +3,94 @@ name: Build HP-150 Toolkit Binaries
 on:
   push:
     tags:
-      - 'v*'  # Se ejecuta cuando se crea un tag que empiece con 'v'
-  pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:  # Permite ejecutar manualmente
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false  # No cancelar otros jobs si uno falla
       matrix:
         include:
-          # macOS Universal Binary (Apple Silicon + Intel)
           - os: macos-latest
             python-version: '3.11'
-            arch: 'x64'
-            artifact-name: 'hp150-toolkit-macos-universal'
+            artifact-name: 'hp150-toolkit-macos'
             
-          # Windows 64-bit
           - os: windows-latest
             python-version: '3.11'
-            arch: 'x64'
-            artifact-name: 'hp150-toolkit-win64'
+            artifact-name: 'hp150-toolkit-windows'
             
-          # Windows 32-bit
-          - os: windows-latest
-            python-version: '3.11'
-            arch: 'x86'
-            artifact-name: 'hp150-toolkit-win32'
-            
-          # Linux 64-bit
           - os: ubuntu-latest
             python-version: '3.11'
-            arch: 'x64'
-            artifact-name: 'hp150-toolkit-linux64'
+            artifact-name: 'hp150-toolkit-linux'
 
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-        architecture: ${{ matrix.arch }}
     
-    # Instalar dependencias específicas del sistema
-    - name: Install system dependencies (Ubuntu)
+    - name: Install dependencies (Linux)
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-tk python3-dev
+        sudo apt-get install -y python3-tk
         
-    - name: Install system dependencies (macOS)
-      if: runner.os == 'macOS'
-      run: |
-        # tkinter ya viene con Python en macOS
-        brew install --quiet python-tk || echo "python-tk ya instalado"
-        
-    - name: Install system dependencies (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        # tkinter ya viene con Python en Windows
-        echo "No additional dependencies needed for Windows"
-    
-    # Instalar dependencias de Python
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
         pip install pyinstaller
     
-    # Crear el binario con PyInstaller
-    - name: Build executable with PyInstaller (macOS Universal)
+    - name: Build executable (macOS)
       if: matrix.os == 'macos-latest'
       run: |
         pyinstaller --onefile --windowed \
           --name="HP150-Toolkit" \
-          --target-arch=universal2 \
           --add-data="src:src" \
-          --add-data="assets:assets" \
-          --hidden-import=tkinter \
-          --hidden-import=tkinter.ttk \
-          --hidden-import=tkinter.filedialog \
-          --hidden-import=tkinter.messagebox \
-          --hidden-import=tkinter.simpledialog \
-          --collect-all=tkinter \
           run_gui.py
           
-    - name: Build executable with PyInstaller (Windows)
+    - name: Build executable (Windows)
       if: runner.os == 'Windows'
       run: |
-        pyinstaller --onefile --windowed --console ^
-          --name="HP150-Toolkit" ^
-          --add-data="src;src" ^
-          --add-data="assets;assets" ^
-          --hidden-import=tkinter ^
-          --hidden-import=tkinter.ttk ^
-          --hidden-import=tkinter.filedialog ^
-          --hidden-import=tkinter.messagebox ^
-          --hidden-import=tkinter.simpledialog ^
-          --collect-all=tkinter ^
-          run_gui.py
+        echo "Contenido del directorio:"
+        dir
+        echo "Contenido de src:"
+        dir src
+        echo "Probando importación:"
+        python -c "import sys; sys.path.insert(0, 'src'); from gui.hp150_gui import HP150ImageManager; print('Import exitoso')"
+        echo "Ejecutando PyInstaller:"
+        pyinstaller --onefile --console --name="HP150-Toolkit" --paths="src" --hidden-import="gui.hp150_gui" --hidden-import="gui.hp150_gui_extended" --hidden-import="tools.hp150_fat" run_gui.py
           
-    - name: Build executable with PyInstaller (Linux)
+    - name: Build executable (Linux)
       if: runner.os == 'Linux'
       run: |
         pyinstaller --onefile \
           --name="HP150-Toolkit" \
           --add-data="src:src" \
-          --add-data="assets:assets" \
-          --hidden-import=tkinter \
-          --hidden-import=tkinter.ttk \
-          --hidden-import=tkinter.filedialog \
-          --hidden-import=tkinter.messagebox \
-          --hidden-import=tkinter.simpledialog \
-          --collect-all=tkinter \
           run_gui.py
     
-    # Preparar archivos para distribución
-    - name: Prepare distribution (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        mkdir -p dist-final
-        cp dist/HP150-Toolkit dist-final/
-        cp README.md dist-final/ 2>/dev/null || echo "README.md not found"
-        cp LICENSE dist-final/ 2>/dev/null || echo "LICENSE not found"
-        echo "Executable created for macOS Universal (Intel + Apple Silicon)"
-        echo "Run with: ./HP150-Toolkit" > dist-final/HOW_TO_RUN.txt
-        echo "For extended mode: ./HP150-Toolkit --extended" >> dist-final/HOW_TO_RUN.txt
-        
-    - name: Prepare distribution (Windows)
-      if: runner.os == 'Windows'
+    - name: Prepare distribution
       run: |
         mkdir dist-final
-        copy dist\HP150-Toolkit.exe dist-final\
-        copy README.md dist-final\ 2>nul || echo README.md not found
-        copy LICENSE dist-final\ 2>nul || echo LICENSE not found
-        echo Executable created for Windows ${{ matrix.arch }} > dist-final\HOW_TO_RUN.txt
-        echo Run with: HP150-Toolkit.exe >> dist-final\HOW_TO_RUN.txt
-        echo For extended mode: HP150-Toolkit.exe --extended >> dist-final\HOW_TO_RUN.txt
         
-    - name: Prepare distribution (Linux)
-      if: runner.os == 'Linux'
+    - name: Copy files (macOS/Linux)
+      if: runner.os != 'Windows'
       run: |
-        mkdir -p dist-final
         cp dist/HP150-Toolkit dist-final/
-        cp README.md dist-final/ 2>/dev/null || echo "README.md not found"
-        cp LICENSE dist-final/ 2>/dev/null || echo "LICENSE not found"
-        echo "Executable created for Linux 64-bit"
         echo "Run with: ./HP150-Toolkit" > dist-final/HOW_TO_RUN.txt
-        echo "For extended mode: ./HP150-Toolkit --extended" >> dist-final/HOW_TO_RUN.txt
-        chmod +x dist-final/HP150-Toolkit
+        echo "Extended mode: ./HP150-Toolkit --extended" >> dist-final/HOW_TO_RUN.txt
+        
+    - name: Copy files (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        copy dist\HP150-Toolkit.exe dist-final\
+        echo Run with: HP150-Toolkit.exe > dist-final\HOW_TO_RUN.txt
+        echo Extended mode: HP150-Toolkit.exe --extended >> dist-final\HOW_TO_RUN.txt
     
-    # Subir artefactos
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -164,36 +98,22 @@ jobs:
         path: dist-final/
         retention-days: 30
     
-    # Crear release si es un tag
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: |
-          dist-final/*
+        files: dist-final/*
         name: "HP-150 Toolkit ${{ github.ref_name }}"
         body: |
           ## HP-150 Toolkit - Release ${{ github.ref_name }}
           
-          Binarios disponibles para múltiples plataformas:
+          Binarios disponibles:
+          - 🍎 macOS
+          - 🪟 Windows 
+          - 🐧 Linux
           
-          - 🍎 **macOS Universal**: Compatible con Intel y Apple Silicon
-          - 🪟 **Windows 64-bit**: Para sistemas Windows modernos
-          - 🪟 **Windows 32-bit**: Para sistemas Windows antiguos
-          - 🐧 **Linux 64-bit**: Para distribuciones Linux modernas
-          
-          ### Cómo usar:
-          1. Descarga el binario para tu plataforma
-          2. Descomprime el archivo
-          3. Ejecuta el binario:
-             - **Modo básico**: `./HP150-Toolkit` (macOS/Linux) o `HP150-Toolkit.exe` (Windows)
-             - **Modo extendido**: Agrega `--extended` al comando
-          
-          ### Características:
-          - Interfaz gráfica nativa para cada sistema operativo
-          - Manejo de imágenes de disco HP-150
-          - Extracción y edición de archivos
-          - Soporte para modo básico y extendido
+          Ejecuta con: `./HP150-Toolkit` o `HP150-Toolkit.exe`
+          Modo extendido: agrega `--extended`
         draft: false
         prerelease: false
       env:
