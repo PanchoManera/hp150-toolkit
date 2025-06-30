@@ -48,9 +48,14 @@ jobs:
     - name: Build executable (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        pyinstaller --onefile --windowed \
+        pyinstaller --windowed \
           --name="HP150-Toolkit" \
           --add-data="src:src" \
+          --paths="src" \
+          --hidden-import="gui.hp150_gui" \
+          --hidden-import="gui.hp150_gui_extended" \
+          --hidden-import="tools.hp150_fat" \
+          --noconsole \
           run_gui.py
           
     - name: Build executable (Windows)
@@ -77,12 +82,22 @@ jobs:
       run: |
         mkdir dist-final
         
-    - name: Copy files (macOS/Linux)
-      if: runner.os != 'Windows'
+    - name: Copy files (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        cp -r dist/HP150-Toolkit.app dist-final/
+        echo "🍎 macOS App Bundle" > dist-final/HOW_TO_RUN.txt
+        echo "Double-click HP150-Toolkit.app to run" >> dist-final/HOW_TO_RUN.txt
+        echo "Or from terminal: open HP150-Toolkit.app" >> dist-final/HOW_TO_RUN.txt
+        echo "Mode: Extended by default, use --basic for basic mode" >> dist-final/HOW_TO_RUN.txt
+        
+    - name: Copy files (Linux)
+      if: runner.os == 'Linux'
       run: |
         cp dist/HP150-Toolkit dist-final/
-        echo "Run with: ./HP150-Toolkit" > dist-final/HOW_TO_RUN.txt
-        echo "Extended mode: ./HP150-Toolkit --extended" >> dist-final/HOW_TO_RUN.txt
+        echo "🐧 Linux executable" > dist-final/HOW_TO_RUN.txt
+        echo "Run with: ./HP150-Toolkit" >> dist-final/HOW_TO_RUN.txt
+        echo "Mode: Extended by default, use --basic for basic mode" >> dist-final/HOW_TO_RUN.txt
         
     - name: Copy files (Windows)
       if: runner.os == 'Windows'

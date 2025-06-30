@@ -25,22 +25,22 @@ def main():
         print("brew install python-tk")
         sys.exit(1)
     
-    # Verificar si se debe usar la GUI extendida o básica
-    if len(sys.argv) > 1 and sys.argv[1] == "--extended":
-        # GUI extendida con más funcionalidades
-        from src.gui.hp150_gui_extended import HP150ImageManagerExtended
-        
-        root = tk.Tk()
-        app = HP150ImageManagerExtended(root)
-        print("🚀 Iniciando HP-150 GUI (Modo Extendido)...")
-        
-    else:
-        # GUI básica
+    # Verificar si se debe usar la GUI básica o extendida (extendida por defecto)
+    if len(sys.argv) > 1 and sys.argv[1] == "--basic":
+        # GUI básica (solo si se especifica --basic)
         from src.gui.hp150_gui import HP150ImageManager
         
         root = tk.Tk()
         app = HP150ImageManager(root)
         print("🚀 Iniciando HP-150 GUI (Modo Básico)...")
+        
+    else:
+        # GUI extendida (por defecto)
+        from src.gui.hp150_gui_extended import HP150ImageManagerExtended
+        
+        root = tk.Tk()
+        app = HP150ImageManagerExtended(root)
+        print("🚀 Iniciando HP-150 GUI (Modo Extendido)...")
     
     # Mostrar ayuda inicial
     print("""
@@ -54,8 +54,8 @@ def main():
 │    3. Usa los botones para extraer/editar archivos         │
 │                                                             │
 │ 💡 Modos disponibles:                                      │
-│    • Básico: python3 run_gui.py                           │
-│    • Extendido: python3 run_gui.py --extended             │
+│    • Extendido: python3 run_gui.py (por defecto)         │
+│    • Básico: python3 run_gui.py --basic                   │
 │                                                             │
 │ 🎯 Archivos convertidos disponibles:                      │
 │    • Revisa la carpeta HP150_CONVERTED/                   │
