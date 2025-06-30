@@ -1,0 +1,58 @@
+# HP-150 Disk Definitions - Multiple formats
+# Different HP-150 variants with various capacities
+
+# Standard HP-150: 77 cylinders, 2 heads, 7 sectors per track, 256 bytes per sector
+# Total: 270,336 bytes (1,056 sectors)
+disk hp150
+    cyls = 77
+    heads = 2
+    tracks * ibm.mfm
+        secs = 7
+        bps = 256
+        gap3 = 22
+        rate = 250
+        iam = no
+    end
+end
+
+# Extended HP-150: 85 cylinders, 2 heads, 8 sectors per track, 256 bytes per sector
+# Total: 348,160 bytes (1,360 sectors) - Matches Touch_Games format
+disk hp150ext
+    cyls = 85
+    heads = 2
+    tracks * ibm.mfm
+        secs = 8
+        bps = 256
+        gap3 = 22
+        rate = 250
+        iam = no
+    end
+end
+
+# High-density HP-150: 80 cylinders, 2 heads, 9 sectors per track, 256 bytes per sector
+# Total: 368,640 bytes (1,440 sectors)
+disk hp150hd
+    cyls = 80
+    heads = 2
+    tracks * ibm.mfm
+        secs = 9
+        bps = 256
+        gap3 = 20
+        rate = 250
+        iam = no
+    end
+end
+
+# Double-density HP-150: 77 cylinders, 2 heads, 10 sectors per track, 256 bytes per sector
+# Total: 394,240 bytes (1,540 sectors)
+disk hp150dd
+    cyls = 77
+    heads = 2
+    tracks * ibm.mfm
+        secs = 10
+        bps = 256
+        gap3 = 18
+        rate = 250
+        iam = no
+    end
+end

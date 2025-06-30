@@ -1,0 +1,262 @@
+# HP-150 Toolkit - Archivos a ignorar
+
+# ===============================================
+# DIRECTORIOS ESPECÍFICOS DEL PROYECTO
+# ===============================================
+
+# Directorios de descarga y conversión del museo
+HP150_ALL_ORIGINAL/
+HP150_CONVERTED/
+
+# Directorio de prueba del museo
+HP150_TEST_ORIGINAL/
+HP150_TEST_CONVERTED/
+
+# Entorno virtual Python
+venv/
+env/
+.venv/
+
+# Herramientas externas
+samdisk/
+gotek/
+
+# Imágenes de prueba y temporales
+testimages/
+temp_images/
+*.scp
+*.tmp
+
+# ===============================================
+# ARCHIVOS PYTHON
+# ===============================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# ===============================================
+# ARCHIVOS DEL SISTEMA
+# ===============================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ===============================================
+# ARCHIVOS DE IMAGEN Y DISCO
+# ===============================================
+
+# Imágenes de disco grandes
+*.img
+*.IMG
+*.td0
+*.TD0
+*.scp
+*.SCP
+*.dsk
+*.DSK
+*.d88
+*.D88
+
+# Backups y archivos temporales
+*.bak
+*.backup
+*.orig
+*.temp
+*.swp
+*.swo
+*~
+
+# Archivos comprimidos grandes
+*.zip
+*.rar
+*.7z
+*.tar.gz
+*.tgz
+
+# ===============================================
+# HERRAMIENTAS DE DESARROLLO
+# ===============================================
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+
+# ===============================================
+# LOGS Y ARCHIVOS DE CONFIGURACIÓN
+# ===============================================
+
+# Logs
+*.log
+logs/
+debug.log
+error.log
+
+# Archivos de configuración locales
+config.local
+.env
+.env.local
+.env.*.local
+
+# ===============================================
+# ARCHIVOS ESPECÍFICOS DEL TOOLKIT
+# ===============================================
+
+# Archivos de salida de conversión temporal
+converted_*
+output_*
+temp_*
+
+# Archivos de prueba generados
+test_output/
+test_results/
+
+# Capturas de disco raw
+capture_*.scp
+disk_*.img
+
+# Archivos de diskdef generados dinámicamente
+*.diskdef.generated
+
+# ===============================================
+# EXCLUSIONES ESPECÍFICAS
+# ===============================================
+
+# Mantener archivos de configuración importantes
+!hp150.diskdef
+!config/
+!scripts/
+!src/
+
+# Mantener archivos de documentación
+!*.md
+!*.txt
+!*.rst
+
+# Mantener archivos de ejemplo pequeños (si los hay)
+!examples/*.py
+!examples/*.sh
