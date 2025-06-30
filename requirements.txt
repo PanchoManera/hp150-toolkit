@@ -1,0 +1,8 @@
+# HP-150 Toolkit - Dependencias
+# Solo las dependencias mínimas necesarias ya que tkinter viene incluido con Python
+
+# Para manejar tipos de datos (si es necesario)
+typing-extensions>=4.0.0
+
+# Para desarrollo local (opcional, no necesario para binarios)
+# pyinstaller>=5.0.0  # Se instala en el workflow, no necesario aquí
