@@ -18,7 +18,7 @@ jobs:
           # macOS Universal Binary (Apple Silicon + Intel)
           - os: macos-latest
             python-version: '3.11'
-            arch: 'universal2'
+            arch: 'x64'
             artifact-name: 'hp150-toolkit-macos-universal'
             
           # Windows 64-bit
