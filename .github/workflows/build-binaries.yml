@@ -80,7 +80,6 @@ jobs:
       run: |
         pyinstaller --onefile --windowed \
           --name="HP150-Toolkit" \
-          --icon="assets/icon.icns" \
           --target-arch=universal2 \
           --add-data="src:src" \
           --add-data="assets:assets" \
@@ -97,7 +96,6 @@ jobs:
       run: |
         pyinstaller --onefile --windowed --console ^
           --name="HP150-Toolkit" ^
-          --icon="assets/icon.ico" ^
           --add-data="src;src" ^
           --add-data="assets;assets" ^
           --hidden-import=tkinter ^
@@ -113,7 +111,6 @@ jobs:
       run: |
         pyinstaller --onefile \
           --name="HP150-Toolkit" \
-          --icon="assets/icon.png" \
           --add-data="src:src" \
           --add-data="assets:assets" \
           --hidden-import=tkinter \
