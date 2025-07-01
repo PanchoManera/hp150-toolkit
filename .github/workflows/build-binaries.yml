@@ -6,105 +6,121 @@ on:
       - 'v*'
   workflow_dispatch:
 
+env:
+  PYTHON_VERSION: '3.11'
+  PYINSTALLER_ARGS: '--paths=src --hidden-import=gui.hp150_gui --hidden-import=gui.hp150_gui_extended --hidden-import=tools.hp150_fat'
+
 jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false  # No cancelar otros jobs si uno falla
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
-            python-version: '3.11'
             artifact-name: 'hp150-toolkit-macos'
+            exe-name: 'HP150-Toolkit.app'
+            icon: '🍎'
+            platform: 'macOS'
+            build-type: 'windowed'
             
           - os: windows-latest
-            python-version: '3.11'
             artifact-name: 'hp150-toolkit-windows'
+            exe-name: 'HP150-Toolkit.exe'
+            icon: '🪟'
+            platform: 'Windows'
+            build-type: 'onefile'
             
           - os: ubuntu-latest
-            python-version: '3.11'
             artifact-name: 'hp150-toolkit-linux'
+            exe-name: 'HP150-Toolkit'
+            icon: '🐧'
+            platform: 'Linux'
+            build-type: 'onefile'
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
     
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: ${{ env.PYTHON_VERSION }}
     
-    - name: Install dependencies (Linux)
-      if: runner.os == 'Linux'
+    - name: Install system dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y python3-tk
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+        fi
+      shell: bash
         
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install pyinstaller
     
-    - name: Build executable (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        pyinstaller --windowed \
-          --name="HP150-Toolkit" \
-          --add-data="src:src" \
-          --paths="src" \
-          --hidden-import="gui.hp150_gui" \
-          --hidden-import="gui.hp150_gui_extended" \
-          --hidden-import="tools.hp150_fat" \
-          --noconsole \
-          run_gui.py
-          
-    - name: Build executable (Windows)
+    - name: Debug import (Windows only)
       if: runner.os == 'Windows'
       run: |
-        echo "Contenido del directorio:"
-        dir
-        echo "Contenido de src:"
-        dir src
-        echo "Probando importación:"
-        python -c "import sys; sys.path.insert(0, 'src'); from gui.hp150_gui import HP150ImageManager; print('Import exitoso')"
-        echo "Ejecutando PyInstaller:"
-        pyinstaller --onefile --console --name="HP150-Toolkit" --paths="src" --hidden-import="gui.hp150_gui" --hidden-import="gui.hp150_gui_extended" --hidden-import="tools.hp150_fat" run_gui.py
-          
-    - name: Build executable (Linux)
-      if: runner.os == 'Linux'
+        echo "Testing imports..."
+        python -c "import sys; sys.path.insert(0, 'src'); from gui.hp150_gui import HP150ImageManager; print('✅ Import successful')"
+    
+    - name: Build executable
       run: |
-        pyinstaller --onefile \
-          --name="HP150-Toolkit" \
-          --add-data="src:src" \
-          run_gui.py
+        BUILD_CMD="pyinstaller --name=HP150-Toolkit ${{ env.PYINSTALLER_ARGS }}"
+        
+        # Add OS-specific flags
+        if [ "${{ matrix.build-type }}" == "windowed" ]; then
+          BUILD_CMD="$BUILD_CMD --windowed --add-data=src:src --noconsole"
+        elif [ "${{ matrix.build-type }}" == "onefile" ]; then
+          BUILD_CMD="$BUILD_CMD --onefile"
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            BUILD_CMD="$BUILD_CMD --add-data=src:src"
+          fi
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            BUILD_CMD="$BUILD_CMD --console"
+          fi
+        fi
+        
+        BUILD_CMD="$BUILD_CMD run_gui.py"
+        echo "🔨 Running: $BUILD_CMD"
+        eval $BUILD_CMD
+      shell: bash
     
     - name: Prepare distribution
       run: |
-        mkdir dist-final
+        mkdir -p dist-final
         
-    - name: Copy files (macOS)
-      if: runner.os == 'macOS'
-      run: |
-        cp -r dist/HP150-Toolkit.app dist-final/
-        echo "🍎 macOS App Bundle" > dist-final/HOW_TO_RUN.txt
-        echo "Double-click HP150-Toolkit.app to run" >> dist-final/HOW_TO_RUN.txt
-        echo "Or from terminal: open HP150-Toolkit.app" >> dist-final/HOW_TO_RUN.txt
-        echo "Mode: Extended by default, use --basic for basic mode" >> dist-final/HOW_TO_RUN.txt
+        # Copy executable
+        if [ "$RUNNER_OS" == "macOS" ]; then
+          cp -r "dist/${{ matrix.exe-name }}" dist-final/
+        elif [ "$RUNNER_OS" == "Windows" ]; then
+          cp "dist/${{ matrix.exe-name }}" dist-final/
+        else
+          cp "dist/${{ matrix.exe-name }}" dist-final/
+        fi
         
-    - name: Copy files (Linux)
-      if: runner.os == 'Linux'
-      run: |
-        cp dist/HP150-Toolkit dist-final/
-        echo "🐧 Linux executable" > dist-final/HOW_TO_RUN.txt
-        echo "Run with: ./HP150-Toolkit" >> dist-final/HOW_TO_RUN.txt
-        echo "Mode: Extended by default, use --basic for basic mode" >> dist-final/HOW_TO_RUN.txt
+        # Create HOW_TO_RUN.txt
+        echo "${{ matrix.icon }} ${{ matrix.platform }} Executable" > dist-final/HOW_TO_RUN.txt
         
-    - name: Copy files (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        copy dist\HP150-Toolkit.exe dist-final\
-        echo Run with: HP150-Toolkit.exe > dist-final\HOW_TO_RUN.txt
-        echo Extended mode: HP150-Toolkit.exe --extended >> dist-final\HOW_TO_RUN.txt
+        if [ "$RUNNER_OS" == "macOS" ]; then
+          echo "Run: Double-click ${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
+          echo "Terminal: open ${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
+        elif [ "$RUNNER_OS" == "Windows" ]; then
+          echo "Run: Double-click ${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
+          echo "Terminal: .\\${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
+        else
+          echo "Run: ./${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
+          echo "Make executable: chmod +x ${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
+        fi
+        
+        echo "" >> dist-final/HOW_TO_RUN.txt
+        echo "Modes:" >> dist-final/HOW_TO_RUN.txt
+        echo "  • Extended (default): Full functionality" >> dist-final/HOW_TO_RUN.txt
+        echo "  • Basic: Add --basic flag" >> dist-final/HOW_TO_RUN.txt
+      shell: bash
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -112,23 +128,64 @@ jobs:
         name: ${{ matrix.artifact-name }}
         path: dist-final/
         retention-days: 30
+  
+  release:
+    name: Create Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+    
+    - name: Prepare release files
+      run: |
+        mkdir -p release/
+        
+        # Create zip files for each platform
+        cd artifacts/
+        for dir in */; do
+          platform=$(echo "$dir" | sed 's/-toolkit-/-/' | sed 's|/$||')
+          echo "📦 Creating $platform.zip"
+          cd "$dir"
+          zip -r "../../release/$platform.zip" .
+          cd ..
+        done
+        
+        cd ../release/
+        ls -la
     
     - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: dist-final/*
+        files: release/*.zip
         name: "HP-150 Toolkit ${{ github.ref_name }}"
         body: |
-          ## HP-150 Toolkit - Release ${{ github.ref_name }}
+          ## 🚀 HP-150 Toolkit - Release ${{ github.ref_name }}
           
-          Binarios disponibles:
-          - 🍎 macOS
-          - 🪟 Windows 
-          - 🐧 Linux
+          ### ✨ Nuevas características en esta versión:
+          - Mejorada UI responsiva del diálogo de lectura de floppy
+          - Eliminado prefijo "[STDERR]" de mensajes de track
+          - Reset automático de GreaseWeazle al iniciar
+          - Botones siempre visibles en todas las resoluciones
+          - Layout optimizado con grid para mejor control
           
-          Ejecuta con: `./HP150-Toolkit` o `HP150-Toolkit.exe`
-          Modo extendido: agrega `--extended`
+          ### 📦 Binarios disponibles:
+          - 🍎 **macOS**: `hp150-macos.zip`
+          - 🪟 **Windows**: `hp150-windows.zip` 
+          - 🐧 **Linux**: `hp150-linux.zip`
+          
+          ### 🏃‍♂️ Cómo ejecutar:
+          1. Descarga el archivo para tu plataforma
+          2. Extrae el ZIP
+          3. Lee `HOW_TO_RUN.txt` para instrucciones específicas
+          
+          ### 🔧 Modos disponibles:
+          - **Extendido** (predeterminado): Funcionalidad completa
+          - **Básico**: Agregar flag `--basic`
         draft: false
         prerelease: false
       env:
