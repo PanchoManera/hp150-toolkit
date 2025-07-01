@@ -256,11 +256,11 @@ jobs:
           codesign --force --deep --sign - "$BUNDLE_PATH" 2>/dev/null || echo "WARNING: Could not self-sign bundle"
           
           # Verify the signature
-          codesign --verify --deep "$BUNDLE_PATH" 2/dev/null && echo "OK Bundle signature verified" || echo "WARNING: Bundle signature verification failed"
+          codesign --verify --deep "$BUNDLE_PATH" 2>/dev/null && echo "OK Bundle signature verified" || echo "WARNING: Bundle signature verification failed"
           
           # Verify bundle structure
           echo "Bundle structure:"
-          find "$BUNDLE_PATH" -type f 2/dev/null | head -10 || echo "Could not list bundle contents"
+          find "$BUNDLE_PATH" -type f 2>/dev/null | head -10 || echo "Could not list bundle contents"
           
           echo "OK macOS bundle prepared"
           

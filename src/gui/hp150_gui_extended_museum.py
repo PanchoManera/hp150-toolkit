@@ -1867,9 +1867,21 @@ class HP150ImageManagerExtendedMuseum(HP150ImageManager):
                 stdout_fd = process.stdout.fileno()
                 stderr_fd = process.stderr.fileno()
                 
-                # Hacer los pipes no bloqueantes
-                os.set_blocking(stdout_fd, False)
-                os.set_blocking(stderr_fd, False)
+                # Hacer los pipes no bloqueantes (compatibilidad Windows/Unix)
+                try:
+                    # En Unix/Linux/macOS
+                    os.set_blocking(stdout_fd, False)
+                    os.set_blocking(stderr_fd, False)
+                except AttributeError:
+                    # En Windows, os.set_blocking no existe
+                    # Usar fcntl si está disponible, sino continuar sin modo no bloqueante
+                    try:
+                        import fcntl
+                        fcntl.fcntl(stdout_fd, fcntl.F_SETFL, os.O_NONBLOCK)
+                        fcntl.fcntl(stderr_fd, fcntl.F_SETFL, os.O_NONBLOCK)
+                    except (ImportError, OSError):
+                        # En Windows sin fcntl, usar un enfoque alternativo
+                        pass
                 
                 while True:
                     if cancel_requested['value']:
