@@ -69,73 +69,11 @@ jobs:
     - name: Create application icon (macOS only)
       if: runner.os == 'macOS'
       run: |
-        # Create a simple icon for the macOS bundle
         echo "🎨 Creating application icon for macOS..."
         
-        # Create icon directory
-        mkdir -p icon_temp
-        
-        # Create a simple PNG icon using Python
-        cat > create_icon.py << 'EOF'
-from PIL import Image, ImageDraw, ImageFont
-import os
-
-# Create a simple 512x512 icon
-size = 512
-img = Image.new('RGBA', (size, size), (70, 130, 180, 255))  # Steel blue background
-draw = ImageDraw.Draw(img)
-
-# Draw a simple computer/floppy disk icon
-rect_color = (255, 255, 255, 255)  # White
-# Main rectangle (computer/floppy)
-draw.rectangle([100, 150, 412, 400], fill=rect_color, outline=(0, 0, 0, 255), width=3)
-# Slot for disk
-draw.rectangle([130, 180, 382, 220], fill=(0, 0, 0, 255))
-# Label area
-draw.rectangle([150, 240, 362, 280], fill=(200, 200, 200, 255))
-# Text
-try:
-    font = ImageFont.truetype('/System/Library/Fonts/Arial.ttf', 36)
-except:
-    font = ImageFont.load_default()
-draw.text((size//2, 320), 'HP-150', fill=(0, 0, 0, 255), font=font, anchor='mm')
-draw.text((size//2, 360), 'Toolkit', fill=(0, 0, 0, 255), font=font, anchor='mm')
-
-# Save as PNG
-img.save('icon_temp/icon.png')
-print('Icon created successfully')
-EOF
-        
-        python create_icon.py 2>/dev/null || echo "Could not create custom icon, will use default"
-        
-        # Convert PNG to ICNS if we have iconutil (macOS)
-        if [ -f "icon_temp/icon.png" ]; then
-          echo "🔄 Converting PNG to ICNS..."
-          mkdir -p icon_temp/AppIcon.iconset
-          
-          # Create different sizes for the iconset
-          if command -v sips >/dev/null 2>&1; then
-            sips -z 16 16 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_16x16.png
-            sips -z 32 32 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_16x16@2x.png
-            sips -z 32 32 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_32x32.png
-            sips -z 64 64 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_32x32@2x.png
-            sips -z 128 128 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_128x128.png
-            sips -z 256 256 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_128x128@2x.png
-            sips -z 256 256 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_256x256.png
-            sips -z 512 512 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_256x256@2x.png
-            sips -z 512 512 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_512x512.png
-            sips -z 1024 1024 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_512x512@2x.png
-            
-            # Create ICNS file
-            iconutil -c icns icon_temp/AppIcon.iconset -o app_icon.icns
-            echo "✅ ICNS icon created: app_icon.icns"
-          else
-            echo "⚠️ sips not available, using PNG icon directly"
-            cp icon_temp/icon.png app_icon.png
-          fi
-        else
-          echo "⚠️ No icon created, will use default PyInstaller icon"
-        fi
+        # Skip icon creation for now to avoid YAML issues
+        # PyInstaller will use default icon
+        echo "⚠️ Using default PyInstaller icon for this build"
     
     - name: Debug import (Windows only)
       if: runner.os == 'Windows'
