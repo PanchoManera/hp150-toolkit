@@ -1058,8 +1058,37 @@ class HP150ImageManagerExtended(HP150ImageManager):
         # Cerrar aplicación
         self.root.destroy()
     
+    def check_temp_files_before_action(self, action_name="continuar"):
+        """Verificar si hay archivos temporales sin guardar antes de una acción"""
+        if self.has_temp_files and self.temp_scp_file and self.temp_img_file:
+            if os.path.exists(self.temp_scp_file) and os.path.exists(self.temp_img_file):
+                result = messagebox.askyesnocancel(
+                    "Archivos Temporales Sin Guardar",
+                    f"Tienes archivos temporales de la lectura del floppy sin guardar.\n\n"
+                    f"¿Deseas guardar el proyecto antes de {action_name}?\n\n"
+                    f"• SÍ: Guardar proyecto completo (SCP + IMG)\n"
+                    f"• NO: Continuar sin guardar (se perderán los datos)\n"
+                    f"• CANCELAR: No {action_name}"
+                )
+                
+                if result is None:  # Cancel - no continuar
+                    return False
+                elif result:  # Yes - guardar proyecto completo
+                    self.save_floppy_project(self.temp_scp_file, self.temp_img_file)
+                    return True
+                else:  # No - continuar sin guardar
+                    self.has_temp_files = False
+                    self.temp_scp_file = None
+                    self.temp_img_file = None
+                    return True
+        return True  # No hay archivos temporales, continuar normalmente
+    
     def read_from_floppy(self):
         """Leer imagen desde floppy usando GreaseWeazle - flujo simplificado"""
+        # Verificar archivos temporales antes de continuar
+        if not self.check_temp_files_before_action("leer un nuevo floppy"):
+            return
+            
         try:
             print("[DEBUG] Iniciando read_from_floppy()")
             import subprocess
@@ -2193,6 +2222,14 @@ class HP150ImageManagerExtended(HP150ImageManager):
             )
             
             messagebox.showinfo("Proyecto guardado", success_message)
+            
+            # Marcar que ya no hay archivos temporales pendientes
+            self.has_temp_files = False
+            self.temp_scp_file = None
+            self.temp_img_file = None
+            
+            # Marcar imagen como no modificada ya que se guardó
+            self.set_modified(False)
             
         except Exception as e:
             messagebox.showerror("Error", f"Error guardando proyecto: {e}")
