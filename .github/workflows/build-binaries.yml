@@ -113,7 +113,7 @@ jobs:
           if [ "$RUNNER_OS" == "Linux" ]; then
             BUILD_CMD="$BUILD_CMD --add-data=src:src --add-data=scripts:scripts"
           elif [ "$RUNNER_OS" == "Windows" ]; then
-            BUILD_CMD="$BUILD_CMD --console --add-data=src;src --add-data=scripts;scripts"
+            BUILD_CMD="$BUILD_CMD --console --add-data src;src --add-data scripts;scripts"
             # Windows-specific hidden imports for tkinter
             BUILD_CMD="$BUILD_CMD --hidden-import=tkinter --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.ttk"
           fi
@@ -195,8 +195,8 @@ jobs:
           xattr -cr "$BUNDLE_PATH" 2>/dev/null || echo "WARNING Could not remove quarantine attributes"
           
           # Verify bundle structure
-          echo "📁 Bundle structure:"
-          find "$BUNDLE_PATH" -type f | head -10
+          echo "Bundle structure:"
+          find "$BUNDLE_PATH" -type f 2>/dev/null | head -10 || echo "Could not list bundle contents"
           
           echo "OK macOS bundle prepared"
           
@@ -204,12 +204,12 @@ jobs:
           echo "Testing bundle validity..."
           if [ -f "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit" ]; then
             echo "OK Main executable exists"
-            file "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit"
-            ls -la "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit"
+            file "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit" || true
+            ls -la "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit" || true
           else
             echo "ERROR Main executable not found!"
             echo "Bundle contents:"
-            find "$BUNDLE_PATH" -type f
+            find "$BUNDLE_PATH" -type f || true
             exit 1
           fi
           
