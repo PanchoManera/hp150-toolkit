@@ -1089,59 +1089,112 @@ class HP150ImageManagerExtended(HP150ImageManager):
         if not self.check_temp_files_before_action("leer un nuevo floppy"):
             return
             
-        try:
-            print("[DEBUG] Iniciando read_from_floppy()")
-            import subprocess
-            from datetime import datetime
-            import tempfile
-            
-            print("[DEBUG] Imports completados")
-            
-            # Diálogo simple solo para seleccionar drive
-            print("[DEBUG] Creando diálogo...")
-            dialog = tk.Toplevel(self.root)
-            dialog.title("Leer Floppy")
-            dialog.geometry("400x280")
-            dialog.minsize(400, 280)
-            dialog.transient(self.root)
-            dialog.grab_set()
-            
-            print("[DEBUG] Diálogo creado exitosamente")
-            
-            # Variables
-            drive_var = tk.IntVar(value=0)
-            print("[DEBUG] Variables creadas")
-            
-            # Frame principal
-            main_frame = ttk.Frame(dialog, padding="20")
-            main_frame.pack(fill=tk.BOTH, expand=True)
-            
-            # Título
-            ttk.Label(main_frame, text="📀 Leer Floppy", font=('Arial', 14, 'bold')).pack(pady=(0, 20))
-            
-            # Selección de drive
-            drive_frame = ttk.LabelFrame(main_frame, text="Seleccionar Drive", padding="10")
-            drive_frame.pack(fill=tk.X, pady=(0, 15))
-            
-            ttk.Radiobutton(drive_frame, text="Drive 0 (principal)", variable=drive_var, value=0).pack(anchor=tk.W)
-            ttk.Radiobutton(drive_frame, text="Drive 1 (secundario)", variable=drive_var, value=1).pack(anchor=tk.W)
-            
-            # Información
-            info_label = ttk.Label(
-                main_frame, 
-                text="🔍 Se detectará automáticamente el formato HP-150\n📀 La imagen se cargará automáticamente en la GUI\n💾 Se preguntará dónde guardarla después",
-                font=('Arial', 10)
-            )
-            info_label.pack(pady=(0, 15))
-            
-            # Botones
-            button_frame = ttk.Frame(main_frame)
-            button_frame.pack(fill=tk.X)
-            
-        except Exception as e:
-            print(f"[ERROR] Error en read_from_floppy: {e}")
-            messagebox.showerror("Error", f"Error iniciando la lectura de floppy:\n{e}")
-            return
+        print("[DEBUG] Iniciando read_from_floppy()")
+        import subprocess
+        from datetime import datetime
+        import tempfile
+        
+        print("[DEBUG] Imports completados")
+        
+        # Diálogo simple solo para seleccionar drive - MÁS GRANDE
+        print("[DEBUG] Creando diálogo...")
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Leer Floppy HP-150")
+        dialog.geometry("500x400")
+        dialog.minsize(480, 380)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Configurar grid en la ventana principal
+        dialog.grid_columnconfigure(0, weight=1)
+        dialog.grid_rowconfigure(0, weight=1)
+        
+        print("[DEBUG] Diálogo creado exitosamente")
+        
+        # Variables
+        drive_var = tk.IntVar(value=0)
+        print("[DEBUG] Variables creadas")
+        
+        # Frame principal con grid
+        main_frame = ttk.Frame(dialog, padding="25")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Configurar grid del frame principal
+        main_frame.grid_columnconfigure(0, weight=1)
+        main_frame.grid_rowconfigure(0, weight=0)  # Título
+        main_frame.grid_rowconfigure(1, weight=0)  # Drive selection
+        main_frame.grid_rowconfigure(2, weight=1)  # Info (expandible)
+        main_frame.grid_rowconfigure(3, weight=0, minsize=60)  # Botones (altura fija)
+        
+        # Título
+        title_frame = ttk.Frame(main_frame)
+        title_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 25))
+        title_frame.grid_columnconfigure(0, weight=1)
+        
+        ttk.Label(title_frame, text="📀 Leer Floppy HP-150", font=('Arial', 16, 'bold')).grid(row=0, column=0)
+        ttk.Label(title_frame, text="Seleccionar drive y configuración", font=('Arial', 10), foreground='gray').grid(row=1, column=0, pady=(5, 0))
+        
+        # Selección de drive
+        drive_frame = ttk.LabelFrame(main_frame, text="Seleccionar Drive", padding="15")
+        drive_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 20))
+        drive_frame.grid_columnconfigure(0, weight=1)
+        
+        ttk.Radiobutton(drive_frame, text="🔄 Drive 0 (principal)", variable=drive_var, value=0).grid(row=0, column=0, sticky=tk.W, pady=3)
+        ttk.Radiobutton(drive_frame, text="🔄 Drive 1 (secundario)", variable=drive_var, value=1).grid(row=1, column=0, sticky=tk.W, pady=3)
+        
+        # Información expandible
+        info_frame = ttk.LabelFrame(main_frame, text="Información", padding="15")
+        info_frame.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 20))
+        info_frame.grid_columnconfigure(0, weight=1)
+        info_frame.grid_rowconfigure(0, weight=1)
+        
+        info_text = tk.Text(
+            info_frame,
+            height=4,
+            width=50,
+            wrap=tk.WORD,
+            relief=tk.FLAT,
+            bg=dialog.cget('bg'),
+            font=('Arial', 10),
+            state=tk.DISABLED,
+            cursor='arrow'
+        )
+        info_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Insertar texto informativo
+        info_text.config(state=tk.NORMAL)
+        info_text.insert('1.0', 
+            "🔍 Se detectará automáticamente el formato HP-150\n"
+            "📀 La imagen se cargará automáticamente en la GUI\n"
+            "💾 Se preguntará dónde guardarla después\n"
+            "⚙️ GreaseWeazle se configurará automáticamente"
+        )
+        info_text.config(state=tk.DISABLED)
+        
+        # Frame de botones con altura fija garantizada
+        button_frame = ttk.Frame(main_frame, padding="10")
+        button_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
+        button_frame.grid_columnconfigure(1, weight=1)  # Espaciador
+        
+        # Separador
+        separator = ttk.Separator(button_frame, orient='horizontal')
+        separator.grid(row=0, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
+        
+        # Botones
+        ttk.Button(
+            button_frame, 
+            text="📀 Iniciar Lectura", 
+            command=lambda: start_read(),
+            width=18,
+            style='Accent.TButton'
+        ).grid(row=1, column=0, padx=(0, 10), pady=5, ipadx=5, ipady=3)
+        
+        ttk.Button(
+            button_frame, 
+            text="❌ Cancelar", 
+            command=lambda: dialog.destroy(),
+            width=15
+        ).grid(row=1, column=2, padx=(10, 0), pady=5, ipadx=5, ipady=3)
         
         def start_read():
             drive = drive_var.get()
@@ -1159,7 +1212,8 @@ class HP150ImageManagerExtended(HP150ImageManager):
             # Crear ventana de progreso con consola
             progress_window = tk.Toplevel(self.root)
             progress_window.title("📀 Leyendo Floppy desde Drive " + str(drive))
-            progress_window.geometry("700x600")
+            progress_window.geometry("900x700")
+            progress_window.minsize(800, 600)
             progress_window.transient(self.root)
             progress_window.grab_set()
             
@@ -1185,20 +1239,25 @@ class HP150ImageManagerExtended(HP150ImageManager):
             progress_bar.pack(fill=tk.X, pady=(10, 0))
             progress_bar.start()
             
-            # Consola de salida
+            # Consola de salida - altura fija pero scrollable
             console_frame = ttk.LabelFrame(main_frame, text="Salida de GreaseWeazle", padding="10")
-            console_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+            console_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
             
             console_text = scrolledtext.ScrolledText(
                 console_frame,
-                height=15,
-                font=('Monaco', 9)
+                height=10,  # Altura fija más pequeña
+                font=('Monaco', 9),
+                wrap=tk.WORD
             )
             console_text.pack(fill=tk.BOTH, expand=True)
             
-            # Botón cancelar
-            cancel_frame = ttk.Frame(main_frame)
-            cancel_frame.pack(fill=tk.X)
+            # Frame de botones con altura fija y padding generoso
+            button_frame = ttk.Frame(main_frame, padding="15")
+            button_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=(10, 0))
+            
+            # Separador visual
+            separator = ttk.Separator(button_frame, orient='horizontal')
+            separator.pack(fill=tk.X, pady=(0, 15))
             
             # Variable para controlar cancelación
             cancel_requested = {'value': False}
@@ -1215,8 +1274,24 @@ class HP150ImageManagerExtended(HP150ImageManager):
                         pass
                 progress_window.destroy()
             
-            cancel_btn = ttk.Button(cancel_frame, text="❌ Cancelar", command=cancel_read)
-            cancel_btn.pack(side=tk.RIGHT)
+            # Información adicional
+            info_label = ttk.Label(
+                button_frame, 
+                text="Puedes cancelar la operación en cualquier momento",
+                font=('Arial', 10),
+                foreground='gray'
+            )
+            info_label.pack(side=tk.LEFT, pady=5)
+            
+            # Botón cancelar con tamaño generoso y padding
+            cancel_btn = ttk.Button(
+                button_frame, 
+                text="❌ Cancelar Lectura", 
+                command=cancel_read,
+                width=25,  # Más ancho
+                style='Accent.TButton'  # Estilo destacado
+            )
+            cancel_btn.pack(side=tk.RIGHT, padx=(20, 0), pady=5, ipadx=10, ipady=5)
             
             def on_read_complete(return_code):
                 """Callback cuando termina la lectura"""
@@ -1260,11 +1335,6 @@ class HP150ImageManagerExtended(HP150ImageManager):
             # Ejecutar secuencia de lectura personalizada
             self.run_floppy_read_sequence(drive, scp_file, img_file, console_text, current_step, progress_bar, on_read_complete, cancel_requested, current_process)
         
-        def cancel():
-            dialog.destroy()
-        
-        ttk.Button(button_frame, text="📀 Leer", command=start_read).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(button_frame, text="❌ Cancelar", command=cancel).pack(side=tk.LEFT)
     
     def write_to_floppy(self):
         """Escribir imagen actual al floppy usando GreaseWeazle"""
@@ -1808,7 +1878,7 @@ class HP150ImageManagerExtended(HP150ImageManager):
                                 try:
                                     error_output = process.stderr.readline()
                                     if error_output:
-                                        console_text.insert(tk.END, f"[STDERR] {error_output}")
+                                        console_text.insert(tk.END, error_output)
                                         console_text.see(tk.END)
                                         console_text.update_idletasks()
                                         
