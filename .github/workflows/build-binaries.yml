@@ -113,7 +113,7 @@ jobs:
           if [ "$RUNNER_OS" == "Linux" ]; then
             BUILD_CMD="$BUILD_CMD --add-data=src:src --add-data=scripts:scripts --add-data=hp150.diskdef:."
           elif [ "$RUNNER_OS" == "Windows" ]; then
-            BUILD_CMD="$BUILD_CMD --console --add-data src;src --add-data scripts;scripts --add-data hp150.diskdef;."
+            BUILD_CMD="$BUILD_CMD --console --add-data=src;src --add-data=scripts;scripts --add-data=hp150.diskdef;."
             # Windows-specific hidden imports for tkinter
             BUILD_CMD="$BUILD_CMD --hidden-import=tkinter --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.ttk"
           fi
@@ -199,8 +199,27 @@ jobs:
           find "$BUNDLE_PATH" -type f -exec xattr -c {} \; 2>/dev/null || true
           find "$BUNDLE_PATH" -type d -exec xattr -c {} \; 2>/dev/null || true
           
-          # Specifically remove quarantine attributes
-          xattr -dr com.apple.quarantine "$BUNDLE_PATH" 2>/dev/null || true
+          # Remove quarantine attributes and other extended attributes
+          echo "Removing quarantine attributes..."
+          xattr -rd com.apple.quarantine "$BUNDLE_PATH" 2> /dev/null || true
+          xattr -cr "$BUNDLE_PATH" 2> /dev/null || true
+          
+          # Fix permissions
+          echo "Setting correct permissions..."
+          chmod +x "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit" 2> /dev/null || true
+          find "$BUNDLE_PATH" -type f -name "*.dylib" -exec chmod 755 {} \; 2> /dev/null || true
+          find "$BUNDLE_PATH" -type f -name "*.so" -exec chmod 755 {} \; 2> /dev/null || true
+
+          # Self-sign the bundle
+          echo "Self-signing the bundle..."
+          codesign --force --deep --sign - "$BUNDLE_PATH" 2> /dev/null || echo "Warning: Could not self-sign the bundle"
+
+          # Verify the signature
+          if codesign --verify --deep "$BUNDLE_PATH" 2> /dev/null; then
+              echo "Bundle signature verified successfully"
+          else
+              echo "Warning: Bundle signature verification failed"
+          fi
           
           # Try to self-sign the bundle to avoid "damaged" warnings
           echo "Attempting to self-sign bundle..."
