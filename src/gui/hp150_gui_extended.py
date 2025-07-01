@@ -5,13 +5,16 @@ Implementaciones completas para manipulación de archivos
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, simpledialog, scrolledtext
+from tkinter import ttk, messagebox, filedialog, simpledialog, scrolledtext
+from .hp150_gui import HP150ImageManager
+from .config_manager import ConfigManager
+from .greasewazle_config_dialog import show_greasewazle_config
 import os
 import sys
-import threading
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
+from datetime import datetime
 
 # Importar HP150FAT
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -27,6 +30,9 @@ class HP150ImageManagerExtended(HP150ImageManager):
     def __init__(self, root):
         super().__init__(root)
         
+        # Inicializar sistema de configuración
+        self.config_manager = ConfigManager()
+        
         # Variables adicionales para funcionalidades extendidas
         self.temp_dir = tempfile.mkdtemp(prefix="hp150_gui_")
         self.file_editors = {}  # Ventanas de edición abiertas
@@ -40,7 +46,7 @@ class HP150ImageManagerExtended(HP150ImageManager):
         # Mostrar el icono al iniciar
         print(APP_ICON)
 
-        # Reset automático de GreaseWeazle
+        # Reset automático de GreaseWeazle (solo si está configurado)
         self.reset_greaseweazle()
 
         # Configurar icono de la ventana
@@ -192,6 +198,16 @@ class HP150ImageManagerExtended(HP150ImageManager):
             self.write_floppy_btn.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=2)
             print(f"[DEBUG] Botón Escribir Floppy creado")
             
+            # Botón de configuración de GreaseWeazle
+            self.config_gw_btn = ttk.Button(
+                floppy_section, 
+                text="⚙️ Configurar GW", 
+                command=self.show_greasewazle_config,
+                width=14
+            )
+            self.config_gw_btn.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=2)
+            print(f"[DEBUG] Botón Configurar GreaseWeazle creado")
+            
             print(f"[DEBUG] ✅ Botones de floppy agregados exitosamente a la columna derecha!")
         else:
             print(f"[DEBUG] ERROR: No se encontró el panel de botones 'Acciones'")
@@ -271,6 +287,10 @@ class HP150ImageManagerExtended(HP150ImageManager):
     
     def reset_greaseweazle(self):
         """Configurar y resetear GreaseWeazle al iniciar la GUI"""
+        if not self.config_manager.is_greasewazle_configured():
+            print("⚠️ GreaseWeazle no configurado. Configure desde el menú de configuración.")
+            return
+        
         import subprocess
         import threading
         
@@ -278,8 +298,9 @@ class HP150ImageManagerExtended(HP150ImageManager):
             try:
                 # Paso 1: Configurar delays
                 print("⚙️ Configurando delays de GreaseWeazle...")
+                gw_path = self.config_manager.get_greasewazle_path()
                 delays_result = subprocess.run(
-                    ['gw', 'delays', '--step', '20000'],
+                    [gw_path, 'delays', '--step', '20000'],
                     capture_output=True,
                     text=True,
                     timeout=10
@@ -293,7 +314,7 @@ class HP150ImageManagerExtended(HP150ImageManager):
                 # Paso 2: Reset
                 print("🔄 Reseteando GreaseWeazle...")
                 reset_result = subprocess.run(
-                    ['gw', 'reset'],
+                    [gw_path, 'reset'],
                     capture_output=True,
                     text=True,
                     timeout=10
@@ -1085,6 +1106,19 @@ class HP150ImageManagerExtended(HP150ImageManager):
     
     def read_from_floppy(self):
         """Leer imagen desde floppy usando GreaseWeazle - flujo simplificado"""
+        # Verificar que GreaseWeazle esté configurado
+        if not self.config_manager.is_greasewazle_configured():
+            result = messagebox.askyesno(
+                "GreaseWeazle no configurado",
+                "GreaseWeazle no está configurado. ¿Deseas configurarlo ahora?"
+            )
+            if result:
+                chosen_path = show_greasewazle_config(self.root, self.config_manager)
+                if not chosen_path:
+                    return
+            else:
+                return
+        
         # Verificar archivos temporales antes de continuar
         if not self.check_temp_files_before_action("leer un nuevo floppy"):
             return
@@ -1338,6 +1372,19 @@ class HP150ImageManagerExtended(HP150ImageManager):
     
     def write_to_floppy(self):
         """Escribir imagen actual al floppy usando GreaseWeazle"""
+        # Verificar que GreaseWeazle esté configurado
+        if not self.config_manager.is_greasewazle_configured():
+            result = messagebox.askyesno(
+                "GreaseWeazle no configurado",
+                "GreaseWeazle no está configurado. ¿Deseas configurarlo ahora?"
+            )
+            if result:
+                chosen_path = show_greasewazle_config(self.root, self.config_manager)
+                if not chosen_path:
+                    return
+            else:
+                return
+        
         import subprocess
         
         print("[DEBUG] Iniciando write_to_floppy()")
@@ -1743,8 +1790,9 @@ class HP150ImageManagerExtended(HP150ImageManager):
             
             try:
                 # Paso 1: Configurar delays
+                gw_path = self.config_manager.get_greasewazle_path()
                 delays_process = subprocess.run(
-                    ['gw', 'delays', '--step', '20000'],
+                    [gw_path, 'delays', '--step', '20000'],
                     capture_output=True,
                     text=True,
                     timeout=10
@@ -1757,7 +1805,7 @@ class HP150ImageManagerExtended(HP150ImageManager):
                 
                 # Paso 2: Reset
                 reset_process = subprocess.run(
-                    ['gw', 'reset'],
+                    [gw_path, 'reset'],
                     capture_output=True,
                     text=True,
                     timeout=10
@@ -1785,8 +1833,9 @@ class HP150ImageManagerExtended(HP150ImageManager):
             console_text.insert(tk.END, f"\nPaso 1: Leyendo desde drive {drive} a SCP...\n")
             console_text.see(tk.END)
             
+            gw_path = self.config_manager.get_greasewazle_path()
             cmd = [
-                "gw", "read", 
+                gw_path, "read", 
                 f"--drive={drive}", 
                 "--tracks=c=0-76:h=0-1:step=1",
                 "--retries=3",
@@ -1972,8 +2021,9 @@ class HP150ImageManagerExtended(HP150ImageManager):
             console_text.see(tk.END)
             
             # Usar directamente ibm.scan que sabemos que funciona
+            gw_path = self.config_manager.get_greasewazle_path()
             cmd = [
-                "gw", "convert", 
+                gw_path, "convert", 
                 "--format=ibm.scan",
                 scp_file,
                 img_file
@@ -2105,8 +2155,9 @@ class HP150ImageManagerExtended(HP150ImageManager):
             console_text.see(tk.END)
             
             # Usar GreaseWeazle con el formato detectado
+            gw_path = self.config_manager.get_greasewazle_path()
             cmd = [
-                "gw", "convert", 
+                gw_path, "convert", 
                 f"--diskdef=hp150.diskdef:{hp150_format}",
                 "--format=ibm.scan",
                 scp_file,
@@ -2345,6 +2396,15 @@ class HP150ImageManagerExtended(HP150ImageManager):
             
         except Exception as e:
             messagebox.showerror("Error", f"Error guardando imagen: {e}")
+    
+    def show_greasewazle_config(self):
+        """Mostrar diálogo de configuración de GreaseWeazle"""
+        chosen_path = show_greasewazle_config(self.root, self.config_manager)
+        if chosen_path:
+            messagebox.showinfo(
+                "Configuración actualizada",
+                f"GreaseWeazle configurado en:\n{chosen_path}\n\nYa puedes usar las funciones de lectura y escritura de floppy."
+            )
 
 def main():
     """Función principal para la versión extendida"""

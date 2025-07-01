@@ -8,7 +8,7 @@ on:
 
 env:
   PYTHON_VERSION: '3.11'
-  PYINSTALLER_ARGS: '--paths=src --hidden-import=gui.hp150_gui --hidden-import=gui.hp150_gui_extended --hidden-import=tools.hp150_fat'
+  PYINSTALLER_ARGS: '--paths=src --hidden-import=gui.hp150_gui --hidden-import=gui.hp150_gui_extended --hidden-import=gui.config_manager --hidden-import=gui.greasewazle_config_dialog --hidden-import=tools.hp150_fat'
 
 jobs:
   build:
@@ -53,6 +53,9 @@ jobs:
         if [ "$RUNNER_OS" == "Linux" ]; then
           sudo apt-get update
           sudo apt-get install -y python3-tk
+        elif [ "$RUNNER_OS" == "Windows" ]; then
+          # Windows Python from actions/setup-python includes tkinter by default
+          echo "Windows: tkinter should be available by default"
         fi
       shell: bash
         
@@ -65,7 +68,14 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         echo "Testing imports..."
-        python -c "import sys; sys.path.insert(0, 'src'); from gui.hp150_gui import HP150ImageManager; print('✅ Import successful')"
+        python -c "import sys; print('Python version:', sys.version)"
+        python -c "import tkinter; print('✅ tkinter available')"
+        python -c "import sys; print('Python path:', sys.path[:3])"
+        echo "Current directory structure:"
+        dir /s /b src\gui
+        python -c "import sys; sys.path.insert(0, 'src'); from gui.hp150_gui import HP150ImageManager; print('✅ HP150ImageManager import successful')"
+        python -c "import sys; sys.path.insert(0, 'src'); from gui.hp150_gui_extended import HP150ImageManagerExtended; print('✅ HP150ImageManagerExtended import successful')"
+        echo "✅ All imports successful"
     
     - name: Build executable
       run: |
@@ -78,9 +88,10 @@ jobs:
           BUILD_CMD="$BUILD_CMD --onefile"
           if [ "$RUNNER_OS" == "Linux" ]; then
             BUILD_CMD="$BUILD_CMD --add-data=src:src"
-          fi
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            BUILD_CMD="$BUILD_CMD --console"
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+            BUILD_CMD="$BUILD_CMD --console --add-data=src;src"
+            # Windows-specific hidden imports for tkinter
+            BUILD_CMD="$BUILD_CMD --hidden-import=tkinter --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.ttk"
           fi
         fi
         

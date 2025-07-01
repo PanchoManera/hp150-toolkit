@@ -28,7 +28,7 @@ def main():
     # Verificar si se debe usar la GUI básica o extendida (extendida por defecto)
     if len(sys.argv) > 1 and sys.argv[1] == "--basic":
         # GUI básica (solo si se especifica --basic)
-        from src.gui.hp150_gui import HP150ImageManager
+        from gui.hp150_gui import HP150ImageManager
         
         root = tk.Tk()
         app = HP150ImageManager(root)
@@ -36,7 +36,7 @@ def main():
         
     else:
         # GUI extendida (por defecto)
-        from src.gui.hp150_gui_extended import HP150ImageManagerExtended
+        from gui.hp150_gui_extended import HP150ImageManagerExtended
         
         root = tk.Tk()
         app = HP150ImageManagerExtended(root)

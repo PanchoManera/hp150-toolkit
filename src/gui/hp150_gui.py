@@ -13,6 +13,8 @@ from pathlib import Path
 
 # Importar nuestros módulos
 from src.tools.hp150_fat import HP150FAT
+from .config_manager import ConfigManager
+from .greasewazle_config_dialog import show_greasewazle_config
 
 class HP150ImageManager:
     def __init__(self, root):
@@ -57,6 +59,9 @@ class HP150ImageManager:
         self.current_image = None
         self.fat_handler = None
         self.modified = False
+        
+        # Inicializar sistema de configuración
+        self.config_manager = ConfigManager()
         
         # Configurar estilo
         self.setup_styles()
