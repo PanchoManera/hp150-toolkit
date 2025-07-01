@@ -270,33 +270,48 @@ class HP150ImageManagerExtended(HP150ImageManager):
             self.analyze_btn.config(state='disabled')
     
     def reset_greaseweazle(self):
-        """Reset GreaseWeazle al iniciar la GUI"""
+        """Configurar y resetear GreaseWeazle al iniciar la GUI"""
         import subprocess
         import threading
         
         def do_reset():
             try:
+                # Paso 1: Configurar delays
+                print("⚙️ Configurando delays de GreaseWeazle...")
+                delays_result = subprocess.run(
+                    ['gw', 'delays', '--step', '20000'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                
+                if delays_result.returncode == 0:
+                    print("✅ Delays configurados exitosamente (--step 20000)")
+                else:
+                    print(f"⚠️ Warning configurando delays: {delays_result.stderr}")
+                
+                # Paso 2: Reset
                 print("🔄 Reseteando GreaseWeazle...")
-                result = subprocess.run(
+                reset_result = subprocess.run(
                     ['gw', 'reset'],
                     capture_output=True,
                     text=True,
                     timeout=10
                 )
                 
-                if result.returncode == 0:
+                if reset_result.returncode == 0:
                     print("✅ GreaseWeazle reseteado exitosamente")
                 else:
-                    print(f"⚠️ Warning en reset de GreaseWeazle: {result.stderr}")
+                    print(f"⚠️ Warning en reset de GreaseWeazle: {reset_result.stderr}")
                     
             except subprocess.TimeoutExpired:
-                print("⚠️ Timeout en reset de GreaseWeazle - continuando de todos modos")
+                print("⚠️ Timeout en configuración de GreaseWeazle - continuando de todos modos")
             except subprocess.CalledProcessError as e:
-                print(f"⚠️ Error en reset de GreaseWeazle: {e}")
+                print(f"⚠️ Error en configuración de GreaseWeazle: {e}")
             except FileNotFoundError:
                 print("⚠️ GreaseWeazle no encontrado - ¿está instalado y en PATH?")
             except Exception as e:
-                print(f"⚠️ Error inesperado en reset de GreaseWeazle: {e}")
+                print(f"⚠️ Error inesperado en configuración de GreaseWeazle: {e}")
         
         # Ejecutar reset en hilo separado para no bloquear la GUI
         threading.Thread(target=do_reset, daemon=True).start()
@@ -1622,8 +1637,53 @@ class HP150ImageManagerExtended(HP150ImageManager):
             if cancel_requested['value']:
                 return
                 
+            # Primero hacer reset de GreaseWeazle
+            current_step.config(text="🔄 Reseteando GreaseWeazle...")
+            console_text.insert(tk.END, f"Reseteando GreaseWeazle antes de lectura...\n")
+            console_text.see(tk.END)
+            
+            try:
+                # Paso 1: Configurar delays
+                delays_process = subprocess.run(
+                    ['gw', 'delays', '--step', '20000'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                
+                if delays_process.returncode == 0:
+                    console_text.insert(tk.END, "\u2705 Delays configurados (--step 20000)\n")
+                else:
+                    console_text.insert(tk.END, f"\u26a0\ufe0f Warning configurando delays: {delays_process.stderr}\n")
+                
+                # Paso 2: Reset
+                reset_process = subprocess.run(
+                    ['gw', 'reset'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                
+                if reset_process.returncode == 0:
+                    console_text.insert(tk.END, "\u2705 GreaseWeazle reseteado exitosamente\n")
+                else:
+                    console_text.insert(tk.END, f"\u26a0\ufe0f Warning en reset: {reset_process.stderr}\n")
+                
+                console_text.see(tk.END)
+                
+            except subprocess.TimeoutExpired:
+                console_text.insert(tk.END, "⚠️ Timeout en reset - continuando...\n")
+                console_text.see(tk.END)
+            except Exception as e:
+                console_text.insert(tk.END, f"⚠️ Error en reset: {e} - continuando...\n")
+                console_text.see(tk.END)
+            
+            # Verificar si fue cancelado después del reset
+            if cancel_requested['value']:
+                return
+                
             current_step.config(text="📀 Paso 1: Leyendo flujo magnético...")
-            console_text.insert(tk.END, f"Paso 1: Leyendo desde drive {drive} a SCP...\n")
+            console_text.insert(tk.END, f"\nPaso 1: Leyendo desde drive {drive} a SCP...\n")
             console_text.see(tk.END)
             
             cmd = [
@@ -1859,14 +1919,25 @@ class HP150ImageManagerExtended(HP150ImageManager):
                     console_text.insert(tk.END, f"STDERR: {stderr}")
                 console_text.see(tk.END)
                 
+                # Verificar si la conversión fue exitosa basándose en la salida, no solo en el código
+                conversion_successful = False
+                
                 if process.returncode == 0:
+                    conversion_successful = True
+                elif "✅ Conversión completada:" in stdout:
+                    # A veces el proceso devuelve código != 0 pero la conversión fue exitosa
+                    conversion_successful = True
+                    console_text.insert(tk.END, "⚠️ Warning: Código de salida no-cero pero conversión exitosa\n")
+                
+                if conversion_successful:
                     console_text.insert(tk.END, "✅ Conversión HP-150 completada\n")
                     current_step.config(text="✅ Proceso completado exitosamente!")
+                    progress_bar.stop()
+                    on_complete(0)  # Forzar éxito si la conversión fue exitosa
                 else:
                     console_text.insert(tk.END, f"❌ Error en conversión (código: {process.returncode})\n")
-                
-                progress_bar.stop()
-                on_complete(process.returncode)
+                    progress_bar.stop()
+                    on_complete(process.returncode)
                 
             except Exception as e:
                 try:
