@@ -242,6 +242,12 @@ disk_*.img
 # Archivos de diskdef generados dinámicamente
 *.diskdef.generated
 
+# Binarios compilados y distribuciones
+hp150-toolkit-*/
+dist-final/
+icon_temp/
+app_icon.*
+
 # ===============================================
 # EXCLUSIONES ESPECÍFICAS
 # ===============================================

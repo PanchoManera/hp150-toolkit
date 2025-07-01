@@ -63,6 +63,78 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pyinstaller
+        # Install Pillow for icon creation (macOS only, but doesn't hurt on other platforms)
+        pip install Pillow
+    
+    - name: Create application icon (macOS only)
+      if: runner.os == 'macOS'
+      run: |
+        # Create a simple icon for the macOS bundle
+        echo "🎨 Creating application icon for macOS..."
+        
+        # Create icon directory
+        mkdir -p icon_temp
+        
+        # Create a simple PNG icon (this is just a placeholder)
+        # In a real scenario, you'd have an actual icon file
+        python -c "
+from PIL import Image, ImageDraw, ImageFont
+import os
+
+# Create a simple 512x512 icon
+size = 512
+img = Image.new('RGBA', (size, size), (70, 130, 180, 255))  # Steel blue background
+draw = ImageDraw.Draw(img)
+
+# Draw a simple computer/floppy disk icon
+rect_color = (255, 255, 255, 255)  # White
+# Main rectangle (computer/floppy)
+draw.rectangle([100, 150, 412, 400], fill=rect_color, outline=(0, 0, 0, 255), width=3)
+# Slot for disk
+draw.rectangle([130, 180, 382, 220], fill=(0, 0, 0, 255))
+# Label area
+draw.rectangle([150, 240, 362, 280], fill=(200, 200, 200, 255))
+# Text
+try:
+    font = ImageFont.truetype('/System/Library/Fonts/Arial.ttf', 36)
+except:
+    font = ImageFont.load_default()
+draw.text((size//2, 320), 'HP-150', fill=(0, 0, 0, 255), font=font, anchor='mm')
+draw.text((size//2, 360), 'Toolkit', fill=(0, 0, 0, 255), font=font, anchor='mm')
+
+# Save as PNG
+img.save('icon_temp/icon.png')
+print('Icon created successfully')
+" 2>/dev/null || echo "Could not create custom icon, will use default"
+        
+        # Convert PNG to ICNS if we have iconutil (macOS)
+        if [ -f "icon_temp/icon.png" ]; then
+          echo "🔄 Converting PNG to ICNS..."
+          mkdir -p icon_temp/AppIcon.iconset
+          
+          # Create different sizes for the iconset
+          if command -v sips >/dev/null 2>&1; then
+            sips -z 16 16 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_16x16.png
+            sips -z 32 32 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_16x16@2x.png
+            sips -z 32 32 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_32x32.png
+            sips -z 64 64 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_32x32@2x.png
+            sips -z 128 128 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_128x128.png
+            sips -z 256 256 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_128x128@2x.png
+            sips -z 256 256 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_256x256.png
+            sips -z 512 512 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_256x256@2x.png
+            sips -z 512 512 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_512x512.png
+            sips -z 1024 1024 icon_temp/icon.png --out icon_temp/AppIcon.iconset/icon_512x512@2x.png
+            
+            # Create ICNS file
+            iconutil -c icns icon_temp/AppIcon.iconset -o app_icon.icns
+            echo "✅ ICNS icon created: app_icon.icns"
+          else
+            echo "⚠️ sips not available, using PNG icon directly"
+            cp icon_temp/icon.png app_icon.png
+          fi
+        else
+          echo "⚠️ No icon created, will use default PyInstaller icon"
+        fi
     
     - name: Debug import (Windows only)
       if: runner.os == 'Windows'
@@ -84,6 +156,18 @@ jobs:
         # Add OS-specific flags
         if [ "${{ matrix.build-type }}" == "windowed" ]; then
           BUILD_CMD="$BUILD_CMD --windowed --add-data=src:src --add-data=scripts:scripts --noconsole"
+          # macOS-specific options for proper bundle generation
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            BUILD_CMD="$BUILD_CMD --osx-bundle-identifier=com.hp150toolkit.app"
+            # Add icon if available
+            if [ -f "app_icon.icns" ]; then
+              BUILD_CMD="$BUILD_CMD --icon=app_icon.icns"
+              echo "✅ Using custom ICNS icon"
+            elif [ -f "app_icon.png" ]; then
+              BUILD_CMD="$BUILD_CMD --icon=app_icon.png"
+              echo "✅ Using PNG icon"
+            fi
+          fi
         elif [ "${{ matrix.build-type }}" == "onefile" ]; then
           BUILD_CMD="$BUILD_CMD --onefile"
           if [ "$RUNNER_OS" == "Linux" ]; then
@@ -106,7 +190,93 @@ jobs:
         
         # Copy executable
         if [ "$RUNNER_OS" == "macOS" ]; then
+          # Copy macOS bundle
           cp -r "dist/${{ matrix.exe-name }}" dist-final/
+          
+          # Fix macOS bundle structure and permissions
+          echo "🔧 Fixing macOS bundle structure..."
+          
+          # Ensure proper bundle structure
+          BUNDLE_PATH="dist-final/${{ matrix.exe-name }}"
+          
+          # Fix Info.plist if it exists
+          if [ -f "$BUNDLE_PATH/Contents/Info.plist" ]; then
+            echo "✅ Info.plist found"
+            # Ensure bundle identifier is set
+            /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.hp150toolkit.app" "$BUNDLE_PATH/Contents/Info.plist" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.hp150toolkit.app" "$BUNDLE_PATH/Contents/Info.plist"
+            
+            # Set bundle version
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 1.6.1" "$BUNDLE_PATH/Contents/Info.plist" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 1.6.1" "$BUNDLE_PATH/Contents/Info.plist"
+            
+            # Set short version
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.6.1" "$BUNDLE_PATH/Contents/Info.plist" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.6.1" "$BUNDLE_PATH/Contents/Info.plist"
+          else
+            echo "⚠️ Creating minimal Info.plist"
+            mkdir -p "$BUNDLE_PATH/Contents"
+            cat > "$BUNDLE_PATH/Contents/Info.plist" << EOF
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>HP150-Toolkit</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.hp150toolkit.app</string>
+            <key>CFBundleName</key>
+            <string>HP150-Toolkit</string>
+            <key>CFBundleVersion</key>
+            <string>1.6.1</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.6.1</string>
+            <key>CFBundleInfoDictionaryVersion</key>
+            <string>6.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+        </dict>
+        </plist>
+        EOF
+          fi
+          
+          # Fix executable permissions
+          if [ -f "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit" ]; then
+            echo "🔧 Setting executable permissions..."
+            chmod +x "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit"
+            echo "✅ Executable permissions set"
+          else
+            echo "⚠️ Main executable not found, checking alternative locations..."
+            find "$BUNDLE_PATH" -name "HP150-Toolkit" -type f -exec chmod +x {} \;
+          fi
+          
+          # Remove quarantine attributes (helps with unsigned apps)
+          echo "🔧 Removing quarantine attributes..."
+          xattr -cr "$BUNDLE_PATH" 2>/dev/null || echo "⚠️ Could not remove quarantine attributes"
+          
+          # Verify bundle structure
+          echo "📁 Bundle structure:"
+          find "$BUNDLE_PATH" -type f | head -10
+          
+          echo "✅ macOS bundle prepared"
+          
+          # Test bundle validity
+          echo "🧪 Testing bundle validity..."
+          if [ -f "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit" ]; then
+            echo "✅ Main executable exists"
+            file "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit"
+            ls -la "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit"
+          else
+            echo "❌ Main executable not found!"
+            echo "Bundle contents:"
+            find "$BUNDLE_PATH" -type f
+          fi
+          
+          # Create a simple test script
+          echo "#!/bin/bash" > "$BUNDLE_PATH/test_bundle.sh"
+          echo "echo 'Bundle test - can execute scripts'" >> "$BUNDLE_PATH/test_bundle.sh"
+          chmod +x "$BUNDLE_PATH/test_bundle.sh"
+          
         elif [ "$RUNNER_OS" == "Windows" ]; then
           cp "dist/${{ matrix.exe-name }}" dist-final/
         else
