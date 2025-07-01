@@ -1864,146 +1864,137 @@ class HP150ImageManagerExtended(HP150ImageManager):
                 on_complete(1)
         
         def step1_5_detect_format():
-            """Paso 1.5: Detectar formato HP-150 automáticamente desde el SCP"""
+            """Paso 1.5: Convertir y detectar formato HP-150 automáticamente"""
             if cancel_requested['value']:
                 return
             
-            current_step.config(text="🔍 Detectando formato HP-150...")
-            console_text.insert(tk.END, f"\nPaso 1.5: Analizando formato del floppy...\n")
+            current_step.config(text="🔄 Convirtiendo y detectando formato...")
+            console_text.insert(tk.END, f"\nPaso 1.5: Convirtiendo SCP a IMG con ibm.scan...\n")
             console_text.see(tk.END)
             
-            # Definiciones de formatos HP-150 disponibles
-            hp150_formats = {
-                'hp150': {
-                    'cyls': 77, 'heads': 2, 'secs': 7, 'bps': 256,
-                    'expected_size': 270336,  # 77 * 2 * 7 * 256
-                    'description': 'Estándar (77 cyl, 7 sec/track)'
-                },
-                'hp150ext': {
-                    'cyls': 85, 'heads': 2, 'secs': 8, 'bps': 256,
-                    'expected_size': 348160,  # 85 * 2 * 8 * 256
-                    'description': 'Extendido (85 cyl, 8 sec/track)'
-                },
-                'hp150hd': {
-                    'cyls': 80, 'heads': 2, 'secs': 9, 'bps': 256,
-                    'expected_size': 368640,  # 80 * 2 * 9 * 256
-                    'description': 'Alta densidad (80 cyl, 9 sec/track)'
-                },
-                'hp150dd': {
-                    'cyls': 77, 'heads': 2, 'secs': 10, 'bps': 256,
-                    'expected_size': 394240,  # 77 * 2 * 10 * 256
-                    'description': 'Doble densidad (77 cyl, 10 sec/track)'
-                }
-            }
+            # Usar directamente ibm.scan que sabemos que funciona
+            cmd = [
+                "gw", "convert", 
+                "--format=ibm.scan",
+                scp_file,
+                img_file
+            ]
             
-            detected_format = None
-            best_match = None
-            max_data_size = 0
-            
-            console_text.insert(tk.END, "Probando formatos disponibles:\n")
+            console_text.insert(tk.END, f"Comando: {' '.join(cmd)}\n")
             console_text.see(tk.END)
             
-            # Probar cada formato
-            for format_name, format_def in hp150_formats.items():
-                try:
-                    console_text.insert(tk.END, f"  • {format_name}: {format_def['description']}...")
-                    console_text.see(tk.END)
-                    console_text.update_idletasks()
-                    
-                    # Intentar extraer datos usando este formato
-                    cmd = [
-                        "gw", "convert", 
-                        f"--diskdef=hp150.diskdef:{format_name}",
-                        "--format=ibm.scan",
-                        scp_file,
-                        "/dev/null"  # No queremos guardar aún, solo probar
-                    ]
-                    
-                    # Ejecutar comando de prueba
-                    result = subprocess.run(
-                        cmd,
-                        capture_output=True,
-                        text=True,
-                        timeout=30
-                    )
-                    
-                    # Analizar la salida para determinar éxito
-                    if result.returncode == 0:
-                        # Buscar información sobre sectores leídos en la salida
-                        output_lines = result.stdout.split('\n') + result.stderr.split('\n')
-                        sectors_found = 0
-                        data_bytes = 0
-                        
-                        for line in output_lines:
-                            # Buscar patrones que indiquen sectores exitosos
-                            if "sectors" in line.lower() and ("read" in line.lower() or "found" in line.lower()):
-                                # Intentar extraer número de sectores
-                                import re
-                                numbers = re.findall(r'\d+', line)
-                                if numbers:
-                                    sectors_found = max(sectors_found, int(numbers[0]))
-                            
-                            # Buscar tamaño de datos
-                            if "bytes" in line.lower() and "written" in line.lower():
-                                import re
-                                numbers = re.findall(r'\d+', line)
-                                if numbers:
-                                    data_bytes = max(data_bytes, int(numbers[0]))
-                        
-                        # Calcular score basado en sectores encontrados y proximidad al tamaño esperado
-                        expected_sectors = format_def['cyls'] * format_def['heads'] * format_def['secs']
-                        sector_score = sectors_found / expected_sectors if expected_sectors > 0 else 0
-                        
-                        # Si encontramos datos significativos, este es un buen candidato
-                        if sectors_found > 0 or data_bytes > 0:
-                            if data_bytes > max_data_size or (data_bytes == max_data_size and sector_score > 0.8):
-                                max_data_size = data_bytes
-                                detected_format = format_name
-                                best_match = {
-                                    'format': format_name,
-                                    'definition': format_def,
-                                    'sectors_found': sectors_found,
-                                    'data_bytes': data_bytes,
-                                    'sector_score': sector_score
-                                }
-                            
-                            console_text.insert(tk.END, f" ✅ ({sectors_found} sectores, {data_bytes} bytes)\n")
-                        else:
-                            console_text.insert(tk.END, f" ❌ Sin datos\n")
-                    else:
-                        console_text.insert(tk.END, f" ❌ Error\n")
-                    
-                    console_text.see(tk.END)
-                    
-                except subprocess.TimeoutExpired:
-                    console_text.insert(tk.END, f" ⏰ Timeout\n")
-                    console_text.see(tk.END)
-                except Exception as e:
-                    console_text.insert(tk.END, f" ❌ Error: {e}\n")
-                    console_text.see(tk.END)
+            try:
+                # Usar Popen para poder cancelar el proceso
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace'
+                )
                 
-                # Verificar cancelación entre formatos
+                # Guardar proceso para cancelación
+                current_process['process'] = process
+                
+                # Esperar a que termine o se cancele
+                while process.poll() is None:
+                    if cancel_requested['value']:
+                        try:
+                            process.terminate()
+                            console_text.insert(tk.END, "\n❌ Conversión cancelada\n")
+                            console_text.see(tk.END)
+                        except:
+                            pass
+                        return
+                    # Pequeña pausa para no consumir mucha CPU
+                    import time
+                    time.sleep(0.1)
+                
+                # Verificar si fue cancelado
                 if cancel_requested['value']:
                     return
-            
-            # Mostrar resultado de detección
-            if detected_format and best_match:
-                console_text.insert(tk.END, f"\n🎯 Formato detectado: {detected_format}\n")
-                console_text.insert(tk.END, f"   Descripción: {best_match['definition']['description']}\n")
-                console_text.insert(tk.END, f"   Sectores encontrados: {best_match['sectors_found']}\n")
-                console_text.insert(tk.END, f"   Datos extraídos: {best_match['data_bytes']:,} bytes\n")
-                console_text.insert(tk.END, f"   Tamaño esperado: {best_match['definition']['expected_size']:,} bytes\n")
+                
+                # Leer salida
+                stdout, stderr = process.communicate()
+                
+                console_text.insert(tk.END, stdout)
+                if stderr:
+                    console_text.insert(tk.END, f"STDERR: {stderr}")
                 console_text.see(tk.END)
-            else:
-                # Si no detectamos nada, usar formato estándar por defecto
-                detected_format = 'hp150'
-                console_text.insert(tk.END, f"\n⚠️ No se pudo detectar formato específico\n")
-                console_text.insert(tk.END, f"   Usando formato estándar: hp150 (77 cyl, 7 sec/track)\n")
-                console_text.see(tk.END)
+                
+                # Verificar si la conversión fue exitosa
+                if process.returncode == 0 and os.path.exists(img_file):
+                    # Analizar el tamaño del archivo para detectar formato
+                    img_size = os.path.getsize(img_file)
+                    
+                    # Definiciones de formatos HP-150 por tamaño
+                    format_by_size = {
+                        270336: ('hp150', 'Estándar (77 cyl, 7 sec/track)'),
+                        348160: ('hp150ext', 'Extendido (85 cyl, 8 sec/track)'),
+                        368640: ('hp150hd', 'Alta densidad (80 cyl, 9 sec/track)'),
+                        394240: ('hp150dd', 'Doble densidad (77 cyl, 10 sec/track)')
+                    }
+                    
+                    detected_format = 'hp150'  # Por defecto
+                    format_description = 'Estándar (77 cyl, 7 sec/track)'
+                    
+                    # Buscar coincidencia exacta
+                    if img_size in format_by_size:
+                        detected_format, format_description = format_by_size[img_size]
+                        console_text.insert(tk.END, f"\n🎯 Formato detectado: {detected_format}\n")
+                        console_text.insert(tk.END, f"   Descripción: {format_description}\n")
+                        console_text.insert(tk.END, f"   Tamaño: {img_size:,} bytes (coincidencia exacta)\n")
+                    else:
+                        # Buscar el más cercano
+                        closest_size = min(format_by_size.keys(), key=lambda x: abs(x - img_size))
+                        detected_format, format_description = format_by_size[closest_size]
+                        
+                        console_text.insert(tk.END, f"\n🎯 Formato detectado: {detected_format} (aproximado)\n")
+                        console_text.insert(tk.END, f"   Descripción: {format_description}\n")
+                        console_text.insert(tk.END, f"   Tamaño real: {img_size:,} bytes\n")
+                        console_text.insert(tk.END, f"   Tamaño esperado: {closest_size:,} bytes\n")
+                        console_text.insert(tk.END, f"   Diferencia: {abs(img_size - closest_size):,} bytes\n")
+                    
+                    console_text.see(tk.END)
+                    
+                    # La conversión ya está hecha, continuar al paso final
+                    if not cancel_requested['value']:
+                        threading.Thread(target=lambda: step2_finalize_conversion(detected_format, format_description), daemon=True).start()
+                
+                else:
+                    console_text.insert(tk.END, f"❌ Error en conversión (código: {process.returncode})\n")
+                    progress_bar.stop()
+                    on_complete(process.returncode)
+                
+            except Exception as e:
+                try:
+                    console_text.insert(tk.END, f"❌ Error en conversión: {e}\n")
+                    console_text.see(tk.END)
+                except tk.TclError:
+                    pass
+                
+                try:
+                    progress_bar.stop()
+                except tk.TclError:
+                    pass
+                    
+                on_complete(1)
+        
+        def step2_finalize_conversion(detected_format, format_description):
+            """Paso 2: Finalizar conversión exitosa"""
+            if cancel_requested['value']:
+                return
             
-            # Continuar con conversión usando el formato detectado
-            if not cancel_requested['value']:
-                threading.Thread(target=lambda: step2_convert_to_img(detected_format), daemon=True).start()
+            current_step.config(text="✅ Finalización exitosa!")
+            console_text.insert(tk.END, f"\n✅ Conversión finalizada exitosamente\n")
+            console_text.insert(tk.END, f"   Formato HP-150: {detected_format}\n")
+            console_text.insert(tk.END, f"   Descripción: {format_description}\n")
+            console_text.see(tk.END)
+            
+            # Completar proceso exitosamente
+            progress_bar.stop()
+            on_complete(0)
         
         def step2_convert_to_img(hp150_format='hp150'):
             """Paso 2: Convertir SCP a IMG"""
