@@ -1578,16 +1578,55 @@ class HP150ImageManagerExtended(HP150ImageManager):
                     )
             
             # Ejecutar comando con consola en tiempo real
-            # Obtener ruta del script relativa al directorio del proyecto
-            current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            script_path = os.path.join(current_dir, 'scripts', 'write_hp150_floppy.sh')
+            # Obtener ruta del script - compatible con PyInstaller bundle
+            def get_script_path():
+                """Obtener ruta del script compatible con bundle y desarrollo"""
+                script_name = 'write_hp150_floppy.sh'
+                
+                # En aplicación bundleada con PyInstaller
+                if hasattr(sys, '_MEIPASS'):
+                    bundle_script_path = os.path.join(sys._MEIPASS, 'scripts', script_name)
+                    if os.path.exists(bundle_script_path):
+                        return bundle_script_path
+                
+                # En desarrollo - relativo al directorio del proyecto
+                current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                dev_script_path = os.path.join(current_dir, 'scripts', script_name)
+                if os.path.exists(dev_script_path):
+                    return dev_script_path
+                
+                # Búsqueda adicional en directorios comunes
+                possible_paths = [
+                    os.path.join(os.getcwd(), 'scripts', script_name),
+                    os.path.join(os.path.dirname(sys.executable), 'scripts', script_name),
+                    script_name  # En PATH
+                ]
+                
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        return path
+                
+                return None
+            
+            script_path = get_script_path()
             
             print(f"[DEBUG] Construyendo comando de escritura...")
             print(f"[DEBUG] script_path: {script_path}")
-            print(f"[DEBUG] ¿Existe script?: {os.path.exists(script_path)}")
+            print(f"[DEBUG] ¿Existe script?: {script_path and os.path.exists(script_path)}")
             print(f"[DEBUG] current_image: {self.current_image}")
             print(f"[DEBUG] drive: {drive}")
             print(f"[DEBUG] verify: {verify}")
+            
+            console_text.insert(tk.END, f"[DEBUG] Script path: {script_path}\n")
+            console_text.insert(tk.END, f"[DEBUG] ¿Script existe?: {script_path and os.path.exists(script_path)}\n")
+            console_text.insert(tk.END, f"[DEBUG] Directorio actual: {os.getcwd()}\n")
+            
+            # Si el script no existe, usar directamente GreaseWeazle
+            if not script_path or not os.path.exists(script_path):
+                console_text.insert(tk.END, f"⚠️ Script no encontrado, usando GreaseWeazle directamente\n")
+                console_text.see(tk.END)
+                self.write_directly_with_greasewazle(drive, verify, console_text, current_step, progress_bar, on_write_complete, cancel_requested, current_process)
+                return
             
             cmd = [script_path, self.current_image, f'--drive={drive}', '--force']
             
@@ -1596,9 +1635,6 @@ class HP150ImageManagerExtended(HP150ImageManager):
             
             print(f"[DEBUG] Comando final: {cmd}")
             
-            console_text.insert(tk.END, f"[DEBUG] Script path: {script_path}\n")
-            console_text.insert(tk.END, f"[DEBUG] ¿Script existe?: {os.path.exists(script_path)}\n")
-            console_text.insert(tk.END, f"[DEBUG] Directorio actual: {os.getcwd()}\n")
             console_text.insert(tk.END, f"Ejecutando: {' '.join(cmd)}\n")
             console_text.see(tk.END)
             
@@ -2396,6 +2432,139 @@ class HP150ImageManagerExtended(HP150ImageManager):
             
         except Exception as e:
             messagebox.showerror("Error", f"Error guardando imagen: {e}")
+    
+    def write_directly_with_greasewazle(self, drive, verify, console_text, current_step, progress_bar, on_write_complete, cancel_requested, current_process):
+        """Escribir directamente con GreaseWeazle sin usar script"""
+        import subprocess
+        import threading
+        import tempfile
+        
+        def write_process():
+            try:
+                # Paso 1: Convertir IMG a SCP
+                current_step.config(text="🔄 Paso 1: Convirtiendo IMG a SCP...")
+                console_text.insert(tk.END, "Paso 1: Convirtiendo IMG a formato SCP\n")
+                console_text.see(tk.END)
+                
+                # Crear archivo SCP temporal
+                temp_scp = tempfile.mktemp(suffix='.scp', dir=self.temp_dir)
+                
+                gw_path = self.config_manager.get_greasewazle_path()
+                convert_cmd = [
+                    gw_path, "convert",
+                    "--format=ibm.scan", 
+                    self.current_image,
+                    temp_scp
+                ]
+                
+                console_text.insert(tk.END, f"Comando: {' '.join(convert_cmd)}\n")
+                console_text.see(tk.END)
+                
+                # Ejecutar conversión
+                convert_process = subprocess.run(
+                    convert_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                
+                if convert_process.returncode != 0:
+                    console_text.insert(tk.END, f"❌ Error en conversión: {convert_process.stderr}\n")
+                    on_write_complete(convert_process.returncode)
+                    return
+                
+                console_text.insert(tk.END, "✅ Conversión a SCP completada\n")
+                console_text.see(tk.END)
+                
+                if cancel_requested['value']:
+                    return
+                
+                # Paso 2: Escribir SCP al floppy
+                current_step.config(text="💾 Paso 2: Escribiendo al floppy...")
+                console_text.insert(tk.END, f"\nPaso 2: Escribiendo SCP al drive {drive}\n")
+                console_text.see(tk.END)
+                
+                write_cmd = [
+                    gw_path, "write",
+                    f"--drive={drive}",
+                    "--force",
+                    temp_scp
+                ]
+                
+                if verify:
+                    write_cmd.append("--verify")
+                
+                console_text.insert(tk.END, f"Comando: {' '.join(write_cmd)}\n")
+                console_text.see(tk.END)
+                
+                # Ejecutar escritura
+                write_process = subprocess.Popen(
+                    write_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    universal_newlines=True
+                )
+                
+                current_process['process'] = write_process
+                
+                # Leer salida en tiempo real
+                while True:
+                    if cancel_requested['value']:
+                        try:
+                            write_process.terminate()
+                        except:
+                            pass
+                        return
+                    
+                    output = write_process.stdout.readline()
+                    if output:
+                        console_text.insert(tk.END, output)
+                        console_text.see(tk.END)
+                        
+                        # Actualizar progreso
+                        if "Writing cylinder" in output or "Writing track" in output:
+                            current_step.config(text="💾 Escribiendo pistas al disco...")
+                    
+                    # Verificar si el proceso terminó
+                    if write_process.poll() is not None:
+                        # Leer salida restante
+                        remaining_output = write_process.stdout.read()
+                        if remaining_output:
+                            console_text.insert(tk.END, remaining_output)
+                        
+                        remaining_error = write_process.stderr.read()
+                        if remaining_error:
+                            console_text.insert(tk.END, f"STDERR: {remaining_error}")
+                        
+                        console_text.see(tk.END)
+                        break
+                
+                # Limpiar archivo temporal
+                try:
+                    if os.path.exists(temp_scp):
+                        os.remove(temp_scp)
+                except:
+                    pass
+                
+                # Verificar resultado
+                if write_process.returncode == 0:
+                    console_text.insert(tk.END, "✅ Escritura completada exitosamente\n")
+                    current_step.config(text="✅ Escritura completada!")
+                else:
+                    console_text.insert(tk.END, f"❌ Error en escritura (código: {write_process.returncode})\n")
+                
+                on_write_complete(write_process.returncode)
+                
+            except subprocess.TimeoutExpired:
+                console_text.insert(tk.END, "❌ Timeout en operación\n")
+                on_write_complete(1)
+            except Exception as e:
+                console_text.insert(tk.END, f"❌ Error: {e}\n")
+                on_write_complete(1)
+        
+        # Ejecutar en hilo separado
+        threading.Thread(target=write_process, daemon=True).start()
     
     def show_greasewazle_config(self):
         """Mostrar diálogo de configuración de GreaseWeazle"""

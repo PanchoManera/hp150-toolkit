@@ -83,13 +83,13 @@ jobs:
         
         # Add OS-specific flags
         if [ "${{ matrix.build-type }}" == "windowed" ]; then
-          BUILD_CMD="$BUILD_CMD --windowed --add-data=src:src --noconsole"
+          BUILD_CMD="$BUILD_CMD --windowed --add-data=src:src --add-data=scripts:scripts --noconsole"
         elif [ "${{ matrix.build-type }}" == "onefile" ]; then
           BUILD_CMD="$BUILD_CMD --onefile"
           if [ "$RUNNER_OS" == "Linux" ]; then
-            BUILD_CMD="$BUILD_CMD --add-data=src:src"
+            BUILD_CMD="$BUILD_CMD --add-data=src:src --add-data=scripts:scripts"
           elif [ "$RUNNER_OS" == "Windows" ]; then
-            BUILD_CMD="$BUILD_CMD --console --add-data=src;src"
+            BUILD_CMD="$BUILD_CMD --console --add-data=src;src --add-data=scripts;scripts"
             # Windows-specific hidden imports for tkinter
             BUILD_CMD="$BUILD_CMD --hidden-import=tkinter --hidden-import=tkinter.filedialog --hidden-import=tkinter.messagebox --hidden-import=tkinter.ttk"
           fi
