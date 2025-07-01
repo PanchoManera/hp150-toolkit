@@ -133,6 +133,9 @@ jobs:
           # Copy macOS bundle
           cp -r "dist/${{ matrix.exe-name }}" dist-final/
           
+          # Copy the fix script to the bundle directory
+          cp fix_macos_bundle.sh dist-final/ 2>/dev/null || echo "Fix script not found, skipping"
+          
           # Fix macOS bundle structure and permissions
           echo "🔧 Fixing macOS bundle structure..."
           
@@ -182,7 +185,7 @@ jobs:
           
           # Fix executable permissions
           if [ -f "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit" ]; then
-            echo "🔧 Setting executable permissions..."
+            echo "Setting executable permissions..."
             chmod +x "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit"
             echo "OK Executable permissions set"
           else
@@ -190,9 +193,21 @@ jobs:
             find "$BUNDLE_PATH" -name "HP150-Toolkit" -type f -exec chmod +x {} \;
           fi
           
-          # Remove quarantine attributes (helps with unsigned apps)
-          echo "🔧 Removing quarantine attributes..."
-          xattr -cr "$BUNDLE_PATH" 2>/dev/null || echo "WARNING Could not remove quarantine attributes"
+          # Remove quarantine attributes and other extended attributes
+          echo "Cleaning extended attributes..."
+          # Remove all extended attributes recursively
+          find "$BUNDLE_PATH" -type f -exec xattr -c {} \; 2>/dev/null || true
+          find "$BUNDLE_PATH" -type d -exec xattr -c {} \; 2>/dev/null || true
+          
+          # Specifically remove quarantine attributes
+          xattr -dr com.apple.quarantine "$BUNDLE_PATH" 2>/dev/null || true
+          
+          # Try to self-sign the bundle to avoid "damaged" warnings
+          echo "Attempting to self-sign bundle..."
+          codesign --force --deep --sign - "$BUNDLE_PATH" 2>/dev/null || echo "WARNING: Could not self-sign bundle"
+          
+          # Verify the signature
+          codesign --verify --deep "$BUNDLE_PATH" 2>/dev/null && echo "OK Bundle signature verified" || echo "WARNING: Bundle signature verification failed"
           
           # Verify bundle structure
           echo "Bundle structure:"
@@ -225,6 +240,12 @@ jobs:
         if [ "$RUNNER_OS" == "macOS" ]; then
           echo "Run: Double-click ${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
           echo "Terminal: open ${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
+          echo "" >> dist-final/HOW_TO_RUN.txt
+          echo "If macOS says the app is damaged:" >> dist-final/HOW_TO_RUN.txt
+          echo "1. Open Terminal" >> dist-final/HOW_TO_RUN.txt
+          echo "2. Run: sudo xattr -rd com.apple.quarantine ${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
+          echo "3. Run: codesign --force --deep --sign - ${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
+          echo "4. Try opening the app again" >> dist-final/HOW_TO_RUN.txt
         elif [ "$RUNNER_OS" == "Windows" ]; then
           echo "Run: Double-click ${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
           echo "Terminal: .\\${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
