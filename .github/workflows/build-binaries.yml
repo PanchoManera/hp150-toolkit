@@ -80,13 +80,14 @@ jobs:
       run: |
         echo "Testing imports..."
         python -c "import sys; print('Python version:', sys.version)"
-        python -c "import tkinter; print('✅ tkinter available')"
+        python -c "import tkinter; print('OK tkinter available')"
         python -c "import sys; print('Python path:', sys.path[:3])"
         echo "Current directory structure:"
-        dir /s /b src\gui
-        python -c "import sys; sys.path.insert(0, 'src'); from gui.hp150_gui import HP150ImageManager; print('✅ HP150ImageManager import successful')"
-        python -c "import sys; sys.path.insert(0, 'src'); from gui.hp150_gui_extended import HP150ImageManagerExtended; print('✅ HP150ImageManagerExtended import successful')"
-        echo "✅ All imports successful"
+        Get-ChildItem -Path src\gui -Recurse -Name
+        python -c "import sys; sys.path.insert(0, 'src'); from gui.hp150_gui import HP150ImageManager; print('OK HP150ImageManager import successful')"
+        python -c "import sys; sys.path.insert(0, 'src'); from gui.hp150_gui_extended import HP150ImageManagerExtended; print('OK HP150ImageManagerExtended import successful')"
+        echo "OK All imports successful"
+      shell: pwsh
     
     - name: Build executable
       run: |
@@ -140,7 +141,7 @@ jobs:
           
           # Fix Info.plist if it exists
           if [ -f "$BUNDLE_PATH/Contents/Info.plist" ]; then
-            echo "✅ Info.plist found"
+            echo "OK Info.plist found"
             # Ensure bundle identifier is set
             /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.hp150toolkit.app" "$BUNDLE_PATH/Contents/Info.plist" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.hp150toolkit.app" "$BUNDLE_PATH/Contents/Info.plist"
@@ -153,7 +154,7 @@ jobs:
             /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.6.1" "$BUNDLE_PATH/Contents/Info.plist" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.6.1" "$BUNDLE_PATH/Contents/Info.plist"
           else
-            echo "⚠️ Creating minimal Info.plist"
+            echo "WARNING Creating minimal Info.plist"
             mkdir -p "$BUNDLE_PATH/Contents"
             cat > "$BUNDLE_PATH/Contents/Info.plist" << EOF
         <?xml version="1.0" encoding="UTF-8"?>
@@ -183,38 +184,34 @@ jobs:
           if [ -f "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit" ]; then
             echo "🔧 Setting executable permissions..."
             chmod +x "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit"
-            echo "✅ Executable permissions set"
+            echo "OK Executable permissions set"
           else
-            echo "⚠️ Main executable not found, checking alternative locations..."
+            echo "WARNING Main executable not found, checking alternative locations..."
             find "$BUNDLE_PATH" -name "HP150-Toolkit" -type f -exec chmod +x {} \;
           fi
           
           # Remove quarantine attributes (helps with unsigned apps)
           echo "🔧 Removing quarantine attributes..."
-          xattr -cr "$BUNDLE_PATH" 2>/dev/null || echo "⚠️ Could not remove quarantine attributes"
+          xattr -cr "$BUNDLE_PATH" 2>/dev/null || echo "WARNING Could not remove quarantine attributes"
           
           # Verify bundle structure
           echo "📁 Bundle structure:"
           find "$BUNDLE_PATH" -type f | head -10
           
-          echo "✅ macOS bundle prepared"
+          echo "OK macOS bundle prepared"
           
           # Test bundle validity
-          echo "🧪 Testing bundle validity..."
+          echo "Testing bundle validity..."
           if [ -f "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit" ]; then
-            echo "✅ Main executable exists"
+            echo "OK Main executable exists"
             file "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit"
             ls -la "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit"
           else
-            echo "❌ Main executable not found!"
+            echo "ERROR Main executable not found!"
             echo "Bundle contents:"
             find "$BUNDLE_PATH" -type f
+            exit 1
           fi
-          
-          # Create a simple test script
-          echo "#!/bin/bash" > "$BUNDLE_PATH/test_bundle.sh"
-          echo "echo 'Bundle test - can execute scripts'" >> "$BUNDLE_PATH/test_bundle.sh"
-          chmod +x "$BUNDLE_PATH/test_bundle.sh"
           
         elif [ "$RUNNER_OS" == "Windows" ]; then
           cp "dist/${{ matrix.exe-name }}" dist-final/
@@ -222,8 +219,8 @@ jobs:
           cp "dist/${{ matrix.exe-name }}" dist-final/
         fi
         
-        # Create HOW_TO_RUN.txt
-        echo "${{ matrix.icon }} ${{ matrix.platform }} Executable" > dist-final/HOW_TO_RUN.txt
+        # Create HOW_TO_RUN.txt (avoiding Unicode characters that cause encoding issues)
+        echo "${{ matrix.platform }} Executable" > dist-final/HOW_TO_RUN.txt
         
         if [ "$RUNNER_OS" == "macOS" ]; then
           echo "Run: Double-click ${{ matrix.exe-name }}" >> dist-final/HOW_TO_RUN.txt
@@ -238,8 +235,8 @@ jobs:
         
         echo "" >> dist-final/HOW_TO_RUN.txt
         echo "Modes:" >> dist-final/HOW_TO_RUN.txt
-        echo "  • Extended (default): Full functionality" >> dist-final/HOW_TO_RUN.txt
-        echo "  • Basic: Add --basic flag" >> dist-final/HOW_TO_RUN.txt
+        echo "  - Extended (default): Full functionality" >> dist-final/HOW_TO_RUN.txt
+        echo "  - Basic: Add --basic flag" >> dist-final/HOW_TO_RUN.txt
       shell: bash
     
     - name: Upload artifacts
@@ -269,7 +266,7 @@ jobs:
         cd artifacts/
         for dir in */; do
           platform=$(echo "$dir" | sed 's/-toolkit-/-/' | sed 's|/$||')
-          echo "📦 Creating $platform.zip"
+          echo "Creating $platform.zip"
           cd "$dir"
           zip -r "../../release/$platform.zip" .
           cd ..
@@ -284,26 +281,26 @@ jobs:
         files: release/*.zip
         name: "HP-150 Toolkit ${{ github.ref_name }}"
         body: |
-          ## 🚀 HP-150 Toolkit - Release ${{ github.ref_name }}
+          ## HP-150 Toolkit - Release ${{ github.ref_name }}
           
-          ### ✨ Nuevas características en esta versión:
+          ### Nuevas características en esta versión:
           - Mejorada UI responsiva del diálogo de lectura de floppy
           - Eliminado prefijo "[STDERR]" de mensajes de track
           - Reset automático de GreaseWeazle al iniciar
           - Botones siempre visibles en todas las resoluciones
           - Layout optimizado con grid para mejor control
           
-          ### 📦 Binarios disponibles:
-          - 🍎 **macOS**: `hp150-macos.zip`
-          - 🪟 **Windows**: `hp150-windows.zip` 
-          - 🐧 **Linux**: `hp150-linux.zip`
+          ### Binarios disponibles:
+          - **macOS**: `hp150-macos.zip`
+          - **Windows**: `hp150-windows.zip` 
+          - **Linux**: `hp150-linux.zip`
           
-          ### 🏃‍♂️ Cómo ejecutar:
+          ### Cómo ejecutar:
           1. Descarga el archivo para tu plataforma
           2. Extrae el ZIP
           3. Lee `HOW_TO_RUN.txt` para instrucciones específicas
           
-          ### 🔧 Modos disponibles:
+          ### Modos disponibles:
           - **Extendido** (predeterminado): Funcionalidad completa
           - **Básico**: Agregar flag `--basic`
         draft: false
