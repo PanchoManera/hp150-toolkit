@@ -199,26 +199,56 @@ jobs:
           find "$BUNDLE_PATH" -type f -exec xattr -c {} \; 2>/dev/null || true
           find "$BUNDLE_PATH" -type d -exec xattr -c {} \; 2>/dev/null || true
           
-          # Remove quarantine attributes and other extended attributes
-          echo "Removing quarantine attributes..."
-          xattr -rd com.apple.quarantine "$BUNDLE_PATH" 2> /dev/null || true
-          xattr -cr "$BUNDLE_PATH" 2> /dev/null || true
+          # macOS Bundle Fix - Prepare for distribution without quarantine issues
+          echo "🔧 Applying macOS bundle fixes..."
           
-          # Fix permissions
-          echo "Setting correct permissions..."
-          chmod +x "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit" 2> /dev/null || true
-          find "$BUNDLE_PATH" -type f -name "*.dylib" -exec chmod 755 {} \; 2> /dev/null || true
-          find "$BUNDLE_PATH" -type f -name "*.so" -exec chmod 755 {} \; 2> /dev/null || true
-
-          # Self-sign the bundle
-          echo "Self-signing the bundle..."
-          codesign --force --deep --sign - "$BUNDLE_PATH" 2> /dev/null || echo "Warning: Could not self-sign the bundle"
-
-          # Verify the signature
-          if codesign --verify --deep "$BUNDLE_PATH" 2> /dev/null; then
-              echo "Bundle signature verified successfully"
+          # Step 1: Remove ALL extended attributes first
+          echo "📝 Removing extended attributes..."
+          find "$BUNDLE_PATH" -type f -exec xattr -c {} \; 2>/dev/null || true
+          find "$BUNDLE_PATH" -type d -exec xattr -c {} \; 2>/dev/null || true
+          
+          # Step 2: Specifically remove quarantine attributes (belt and suspenders)
+          echo "🧹 Removing quarantine attributes..."
+          xattr -rd com.apple.quarantine "$BUNDLE_PATH" 2>/dev/null || true
+          xattr -cr "$BUNDLE_PATH" 2>/dev/null || true
+          
+          # Step 3: Fix all permissions properly
+          echo "🔒 Setting executable permissions..."
+          # Main executable
+          if [ -f "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit" ]; then
+            chmod +x "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit"
+            echo "✅ Main executable permissions set"
+          fi
+          
+          # All dylibs and shared objects
+          find "$BUNDLE_PATH" -type f -name "*.dylib" -exec chmod 755 {} \;
+          find "$BUNDLE_PATH" -type f -name "*.so" -exec chmod 755 {} \;
+          
+          # Python files should be readable
+          find "$BUNDLE_PATH" -type f -name "*.py" -exec chmod 644 {} \;
+          
+          # Step 4: Self-sign with better error handling
+          echo "✍️ Self-signing the bundle..."
+          if codesign --force --deep --sign - "$BUNDLE_PATH" 2>/dev/null; then
+            echo "✅ Bundle self-signed successfully"
+            
+            # Verify the signature
+            if codesign --verify --deep "$BUNDLE_PATH" 2>/dev/null; then
+              echo "✅ Bundle signature verified successfully"
+            else
+              echo "⚠️ Bundle signature verification failed, but bundle should still work"
+            fi
           else
-              echo "Warning: Bundle signature verification failed"
+            echo "⚠️ Could not self-sign bundle - this might cause security warnings"
+            echo "   Users will need to use 'Open Anyway' or run the fix script"
+          fi
+          
+          # Step 5: Final validation
+          echo "🔍 Final bundle validation..."
+          if [ -x "$BUNDLE_PATH/Contents/MacOS/HP150-Toolkit" ]; then
+            echo "✅ Bundle is ready for distribution"
+          else
+            echo "❌ Bundle validation failed - executable not found or not executable"
           fi
           
           # Try to self-sign the bundle to avoid "damaged" warnings
