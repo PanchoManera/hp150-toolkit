@@ -75,9 +75,8 @@ jobs:
         # Create icon directory
         mkdir -p icon_temp
         
-        # Create a simple PNG icon (this is just a placeholder)
-        # In a real scenario, you'd have an actual icon file
-        python -c "
+        # Create a simple PNG icon using Python
+        cat > create_icon.py << 'EOF'
 from PIL import Image, ImageDraw, ImageFont
 import os
 
@@ -105,7 +104,9 @@ draw.text((size//2, 360), 'Toolkit', fill=(0, 0, 0, 255), font=font, anchor='mm'
 # Save as PNG
 img.save('icon_temp/icon.png')
 print('Icon created successfully')
-" 2>/dev/null || echo "Could not create custom icon, will use default"
+EOF
+        
+        python create_icon.py 2>/dev/null || echo "Could not create custom icon, will use default"
         
         # Convert PNG to ICNS if we have iconutil (macOS)
         if [ -f "icon_temp/icon.png" ]; then
