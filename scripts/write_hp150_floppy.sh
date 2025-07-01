@@ -161,8 +161,9 @@ echo ""
 # Escribir usando definición personalizada HP-150
 # HP-150: 77 cilindros (0-76), 2 cabezas (0-1), 7 sectores por pista (1-7), 256 bytes/sector
 
-# Obtener archivo diskdef usando ruta absoluta
-DISKDEF_FILE="/Users/pancho/HP1250/hp150_toolkit/hp150.diskdef"
+# Obtener archivo diskdef usando ruta relativa al script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DISKDEF_FILE="$SCRIPT_DIR/../hp150.diskdef"
 
 # Verificar que existe el archivo de definición
 if [ ! -f "$DISKDEF_FILE" ]; then
@@ -173,7 +174,36 @@ fi
 echo "📁 Usando definición de disco: $DISKDEF_FILE"
 echo ""
 
-CMD="gw write --drive=$DRIVE"
+# Obtener la ruta configurada de GreaseWeazle
+# Buscar el script de Python que puede leer la configuración  
+GUI_DIR="$(dirname "$SCRIPT_DIR")/src/gui"
+
+# Intentar obtener la ruta de GreaseWeazle desde la configuración
+if [ -f "$GUI_DIR/config_manager.py" ]; then
+    # Crear un script temporal para obtener la configuración
+    GW_PATH=$(python3 -c "
+import sys
+sys.path.insert(0, '$GUI_DIR')
+try:
+    from config_manager import ConfigManager
+    config = ConfigManager()
+    print(config.get_greasewazle_path())
+except:
+    print('gw')
+" 2>/dev/null)
+    
+    if [ -z "$GW_PATH" ] || [ "$GW_PATH" = "None" ]; then
+        GW_PATH="gw"
+    fi
+else
+    # Fallback: intentar encontrar gw en el PATH
+    GW_PATH="gw"
+fi
+
+echo "🔧 Usando GreaseWeazle: $GW_PATH"
+echo ""
+
+CMD="\"$GW_PATH\" write --drive=$DRIVE"
 
 # Usar definición personalizada del HP-150 detectada automáticamente
 CMD="$CMD --diskdefs \"$DISKDEF_FILE\""
